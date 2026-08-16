@@ -20,6 +20,8 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed to attach the APK to GitHub Releases
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,4 +81,3 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: android/app/build/outputs/apk/debug/app-debug.apk
-          generate_release_notes: true
