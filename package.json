@@ -7,9 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build:android": "npx cap sync android",
+    "build:android": "node scripts/bake-app-url.mjs && npx cap sync android",
     "open:android": "npx cap open android",
-    "apk": "npm run build:android && cd android && ./gradlew assembleDebug"
+    "apk": "node scripts/bake-app-url.mjs && npm run build:android && cd android && ./gradlew assembleDebug"
   },
   "engines": {
     "node": ">=20"

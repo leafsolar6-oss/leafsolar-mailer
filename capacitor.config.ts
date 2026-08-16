@@ -3,20 +3,17 @@ import type { CapacitorConfig } from '@capacitor/cli';
 /**
  * Capacitor configuration for building a native Android APK.
  *
- * The app uses a server-side SQLite database and API routes, so the APK
- * loads the hosted web app from APP_URL rather than bundling static files.
- * This gives you a real installable APK that talks to your live backend.
+ * The APK loads a small bundled shell (www/index.html) that probes the hosted
+ * app and then navigates to it. Why not `server.url`? With server.url the
+ * WebView loads the remote site directly and any failure (offline, DNS, TLS,
+ * WebView issue) shows a silent blank green screen. The shell gives a clear
+ * loading state, auto-redirect, and a helpful error + retry when the app
+ * can't be reached.
  *
- * Set APP_URL in your environment (or .env) to your deployed URL, e.g.:
- *   APP_URL=https://leafsolar-mailer.vercel.app
- *
- * Then run:
- *   npm run build:android
- *   npx cap sync android
- *   npx cap open android      (Build > Build APK in Android Studio)
+ * The app URL is baked into www/index.html at build time by
+ * `scripts/bake-app-url.mjs` (APP_URL env), used by the CI workflow and
+ * `npm run build:android`.
  */
-const appUrl = process.env.APP_URL || 'https://mailer.leafsolar.ng';
-
 const config: CapacitorConfig = {
   appId: 'ng.leafsolar.mailer',
   appName: 'Leaf Solar Mailer',
@@ -27,15 +24,16 @@ const config: CapacitorConfig = {
     backgroundColor: '#16a34a',
   },
   server: {
-    url: appUrl,
     androidScheme: 'https',
     cleartext: false,
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1500,
+      launchShowDuration: 1200,
       backgroundColor: '#16a34a',
-      showSpinner: false,
+      showSpinner: true,
+      spinnerColor: '#ffffff',
+      autoHide: true,
     },
   },
 };

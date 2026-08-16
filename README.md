@@ -116,12 +116,18 @@ Common providers:
 ### Option C: Capacitor (Full native build)
 ```bash
 npm install @capacitor/core @capacitor/cli @capacitor/android
-npm run build
+APP_URL=https://leafsolar-mailer.vercel.app npm run build:android
 npx cap add android
-npx cap sync android
 npx cap open android
 ```
 In Android Studio: **Build → Build Bundle(s) / APK(s) → Build APK(s)**
+
+> The APK bundles a small loading shell (`www/index.html`) that probes the app
+> URL baked at build time (default `https://leafsolar-mailer.vercel.app` — the
+> stable Vercel project URL), then loads the live app. If the server can't be
+> reached, the APK shows a clear message with **Retry** and **Open in browser**
+> instead of a blank green screen. `npm run build:android` / `npm run apk`
+> bake `APP_URL` automatically (`scripts/bake-app-url.mjs`).
 
 ## ⏰ Scheduling & Cron
 
@@ -172,7 +178,7 @@ The scheduler endpoint also runs when called manually — you can hit
 
    | Variable | Value |
    |----------|-------|
-   | `APP_URL` | `https://mailer.leafsolar.ng` |
+   | `APP_URL` | `https://leafsolar-mailer.vercel.app` (or `https://mailer.leafsolar.ng`) |
    | `DATABASE_PATH` | `/tmp/leafsolar-data.json` |
    | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM_NAME` / `SMTP_FROM_EMAIL` | your Truehost/Cloudoon mailbox |
    | `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | *(Option A)* from Supabase |

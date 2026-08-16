@@ -47,9 +47,14 @@ jobs:
       - name: Resolve APP_URL
         id: appurl
         run: |
-          URL="${{ github.event.inputs.app_url || vars.APP_URL || secrets.APP_URL || 'https://mailer.leafsolar.ng' }}"
+          URL="${{ github.event.inputs.app_url || vars.APP_URL || secrets.APP_URL || 'https://leafsolar-mailer.vercel.app' }}"
           echo "value=$URL" >> "$GITHUB_OUTPUT"
           echo "APP_URL=$URL"
+
+      - name: Bake APP_URL into APK shell
+        run: node scripts/bake-app-url.mjs
+        env:
+          APP_URL: ${{ steps.appurl.outputs.value }}
 
       - name: Add Android platform (Capacitor)
         run: |
