@@ -2,11 +2,17 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Download, Upload, CloudUpload, HardDriveDownload, ShieldCheck,
-  ExternalLink, Trash2, RefreshCw, DatabaseBackup, History,
+  ExternalLink, Trash2, RefreshCw, DatabaseBackup, History, Server, Database, CheckCircle2, XCircle, AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface ServerBackup { file: string; size: number; created_at: string; }
+interface StoreStatus { configured: boolean; connected: boolean | null; env?: string | null; }
+interface StorageStatus {
+  durable: boolean;
+  redis: StoreStatus;
+  supabase: StoreStatus;
+}
 
 const CLOUD_LINKS = [
   { name: 'Google Drive', url: 'https://drive.google.com/drive/my-drive', color: 'from-yellow-500 to-amber-600', desc: 'Open Drive to check uploaded backups' },
@@ -20,19 +26,36 @@ export default function BackupsPage() {
   const [cloudUrl, setCloudUrl] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [storage, setStorage] = useState<StorageStatus | null>(null);
+  const [testingStorage, setTestingStorage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     try {
-      const [s, c, settings] = await Promise.all([
+      const [s, c, settings, st] = await Promise.all([
         fetch('/api/backup?list=1').then(r => r.json()),
         fetch('/api/backup/cloud').then(r => r.json()),
         fetch('/api/settings').then(r => r.json()).catch(() => ({})),
+        fetch('/api/storage/status').then(r => r.json()).catch(() => null),
       ]);
       setSnapshots(Array.isArray(s) ? s : []);
       setCloudUrl(c.url || '');
       if (settings && typeof settings.auto_backup === 'boolean') setAuto(settings.auto_backup);
+      if (st && typeof st.durable === 'boolean') setStorage(st);
     } catch { /* ignore */ }
+  };
+
+  const testStorage = async () => {
+    setTestingStorage(true);
+    try {
+      const res = await fetch('/api/storage/status?test=1');
+      const st = await res.json();
+      setStorage(st);
+      if (st.durable) toast.success('Durable storage connected ✓');
+      else toast.error('No durable storage configured — data may reset on Vercel cold starts');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally { setTestingStorage(false); }
   };
 
   useEffect(() => { load(); }, []);
@@ -144,6 +167,47 @@ export default function BackupsPage() {
           Save snapshot now
         </button>
       </header>
+
+      {/* Durable storage status */}
+      <div className={`card p-5 ${storage && !storage.durable ? 'border-amber-200 bg-amber-50/40' : ''}`}>
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <h2 className="font-extrabold text-gray-900 flex items-center gap-2">
+            <Server className="w-5 h-5 text-emerald-600" /> Durable storage
+          </h2>
+          <button onClick={testStorage} disabled={testingStorage}
+            className="btn btn-secondary !py-1.5 !px-3 text-xs disabled:opacity-60">
+            {testingStorage ? <div className="spinner !w-3.5 !h-3.5" /> : <><RefreshCw className="w-3.5 h-3.5" /> Test connection</>}
+          </button>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <StoreRow
+            name="Upstash Redis"
+            env={storage?.redis?.env === 'upstash' ? 'UPSTASH_REDIS_REST_URL' : storage?.redis?.env === 'vercel-kv' ? 'KV_REST_API_URL' : null}
+            status={storage?.redis}
+          />
+          <StoreRow
+            name="Supabase Postgres"
+            env={storage?.supabase?.configured ? 'SUPABASE_URL' : null}
+            status={storage?.supabase}
+          />
+        </div>
+        {storage && !storage.durable && (
+          <p className="mt-3 text-xs text-amber-700 flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            No durable storage connected — on Vercel, data lives in memory and can reset between cold starts.
+            Add Upstash Redis (or Supabase) env vars in Vercel, then redeploy.
+          </p>
+        )}
+        {storage && storage.durable && (
+          <p className="mt-3 text-xs text-emerald-700 flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            Data is mirrored to external storage — it survives serverless cold starts. Backups are safe.
+          </p>
+        )}
+        {!storage && (
+          <p className="mt-3 text-xs text-gray-400">Checking storage configuration…</p>
+        )}
+      </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Backup now */}
@@ -261,6 +325,32 @@ export default function BackupsPage() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function StoreRow({ name, env, status }: { name: string; env: string | null; status?: StoreStatus }) {
+  const state = !status
+    ? { dot: 'bg-gray-300', label: 'Checking…', color: 'text-gray-400' }
+    : !status.configured
+      ? { dot: 'bg-gray-300', label: 'Not configured', color: 'text-gray-400' }
+      : status.connected === false
+        ? { dot: 'bg-red-500', label: 'Connection failed', color: 'text-red-600' }
+        : status.connected === true
+          ? { dot: 'bg-emerald-500', label: 'Connected ✓', color: 'text-emerald-700' }
+          : { dot: 'bg-amber-400', label: 'Configured — tap Test', color: 'text-amber-700' };
+  return (
+    <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+      <div className={`w-10 h-10 rounded-xl ${status?.configured ? 'bg-emerald-50' : 'bg-gray-100'} flex items-center justify-center flex-shrink-0`}>
+        <Database className={`w-5 h-5 ${status?.configured ? 'text-emerald-600' : 'text-gray-400'}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-gray-900">{name}</p>
+        <p className={`text-xs font-semibold flex items-center gap-1.5 ${state.color}`}>
+          <span className={`w-2 h-2 rounded-full ${state.dot}`} /> {state.label}
+        </p>
+        {env && <p className="text-[11px] text-gray-400 font-mono mt-0.5 truncate">{env}</p>}
       </div>
     </div>
   );
