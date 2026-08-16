@@ -43,6 +43,71 @@ export function verifyCredentials(email: string, password: string): boolean {
   return hashPassword(password, salt) === hash;
 }
 
+// ----- Login rate limiting (brute-force protection) -----
+// Counters live in the settings map (mirrored to durable storage), so limits
+// are shared across serverless instances. 5 failed attempts within 15 minutes
+// locks that email for 15 minutes.
+
+const MAX_FAILS = 5;
+const WINDOW_MS = 15 * 60 * 1000;
+const LOCK_MS = 15 * 60 * 1000;
+
+function failKey(email: string): string {
+  const h = crypto.createHash('sha256').update(email.toLowerCase().trim()).digest('hex').slice(0, 16);
+  return `login_fail_${h}`;
+}
+
+interface FailState { count: number; first: number; locked_until: number; }
+
+function readFailState(email: string): FailState {
+  const raw = store.settings.get(failKey(email));
+  if (raw) {
+    try {
+      const p = JSON.parse(raw) as FailState;
+      // Expire stale windows.
+      if (Date.now() - p.first > WINDOW_MS && Date.now() > p.locked_until) {
+        return { count: 0, first: 0, locked_until: 0 };
+      }
+      return p;
+    } catch { /* fall through */ }
+  }
+  return { count: 0, first: 0, locked_until: 0 };
+}
+
+function writeFailState(email: string, s: FailState): void {
+  store.settings.set(failKey(email), JSON.stringify(s));
+}
+
+/** Returns an error string if the email is currently locked out. */
+export function checkLoginLockout(email: string): string | null {
+  const s = readFailState(email);
+  if (s.locked_until > Date.now()) {
+    const mins = Math.ceil((s.locked_until - Date.now()) / 60000);
+    return `Too many failed attempts. Try again in ${mins} minute${mins === 1 ? '' : 's'}.`;
+  }
+  return null;
+}
+
+/** Records a failed attempt. Returns the lock message once locked. */
+export function recordFailedLogin(email: string): string | null {
+  const s = readFailState(email);
+  const now = Date.now();
+  const count = (s.first && now - s.first <= WINDOW_MS ? s.count : 0) + 1;
+  const next: FailState = {
+    count,
+    first: s.first && now - s.first <= WINDOW_MS ? s.first : now,
+    locked_until: 0,
+  };
+  if (count >= MAX_FAILS) next.locked_until = now + LOCK_MS;
+  writeFailState(email, next);
+  return next.locked_until ? 'Too many failed attempts. Try again in 15 minutes.' : null;
+}
+
+/** Clears failure counters after a successful login. */
+export function clearLoginFailures(email: string): void {
+  store.settings.set(failKey(email), '');
+}
+
 export function changePassword(currentPassword: string, newPassword: string): boolean {
   const email = store.settings.get('auth_email');
   if (!email) return false;

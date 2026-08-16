@@ -43,61 +43,75 @@ export async function sendCampaignById(campaignId: string): Promise<SendResult> 
 
   updateCampaign(campaignId, { status: 'sending', recipient_count: recipientIds.size });
 
+  // Narrow the campaign type for use inside the worker closures below.
+  const c = campaign;
+
+  // Send in parallel with a bounded concurrency (matches the nodemailer pool's
+  // maxConnections) so a full campaign finishes inside serverless time limits
+  // instead of one-by-one.
+  const CONCURRENCY = 5;
+  const recipients = [...recipientIds];
   let sent = 0, failed = 0;
   const errors: string[] = [];
 
-  for (const contactId of recipientIds) {
-    const contact = getContactById(contactId);
-    if (!contact || contact.status !== 'active') continue;
+  async function worker(): Promise<void> {
+    while (true) {
+      const contactId = recipients.shift();
+      if (!contactId) return;
+      const contact = getContactById(contactId);
+      if (!contact || contact.status !== 'active') continue;
 
-    const trackingId = makeTrackingId(contact.email, campaignId);
-    const personalizedHtml = mergeTemplate(campaign.body, {
-      name: contact.name,
-      email: contact.email,
-      company: contact.company,
-    });
-    const html = addTrackingToHtml(personalizedHtml, trackingId);
-
-    const subject = mergeTemplate(campaign.subject, {
-      name: contact.name,
-      email: contact.email,
-      company: contact.company,
-    });
-
-    const result = await sendEmail({
-      to: contact.email,
-      subject,
-      html,
-      fromName: campaign.sender_name,
-      fromEmail: campaign.sender_email,
-      replyTo: campaign.reply_to,
-    });
-
-    if (result.success) {
-      sent++;
-      addEmailLog({
-        campaign_id: campaignId,
-        contact_email: contact.email,
-        contact_name: contact.name,
-        subject,
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-        tracking_id: trackingId,
+      const trackingId = makeTrackingId(contact.email, campaignId);
+      const personalizedHtml = mergeTemplate(c.body, {
+        name: contact.name,
+        email: contact.email,
+        company: contact.company,
       });
-    } else {
-      failed++;
-      errors.push(`${contact.email}: ${result.error}`);
-      addEmailLog({
-        campaign_id: campaignId,
-        contact_email: contact.email,
-        contact_name: contact.name,
-        subject,
-        status: 'failed',
-        error: result.error,
-        tracking_id: trackingId,
+      const html = addTrackingToHtml(personalizedHtml, trackingId);
+
+      const subject = mergeTemplate(c.subject, {
+        name: contact.name,
+        email: contact.email,
+        company: contact.company,
       });
+
+      const result = await sendEmail({
+        to: contact.email,
+        subject,
+        html,
+        fromName: c.sender_name,
+        fromEmail: c.sender_email,
+        replyTo: c.reply_to,
+      });
+
+      if (result.success) {
+        sent++;
+        addEmailLog({
+          campaign_id: campaignId,
+          contact_email: contact.email,
+          contact_name: contact.name,
+          subject,
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          tracking_id: trackingId,
+        });
+      } else {
+        failed++;
+        if (errors.length < 100) errors.push(`${contact.email}: ${result.error}`);
+        addEmailLog({
+          campaign_id: campaignId,
+          contact_email: contact.email,
+          contact_name: contact.name,
+          subject,
+          status: 'failed',
+          error: result.error,
+          tracking_id: trackingId,
+        });
+      }
     }
   }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, recipients.length) }, () => worker()));
 
   updateCampaign(campaignId, {
     status: failed > 0 && sent === 0 ? 'failed' : 'sent',

@@ -34,7 +34,13 @@ const MAX_SERVER_BACKUPS = 20;
 const AUTO_BACKUP_KEY = 'auto_backup'; // 'on' | 'off'
 
 export function backupDir(): string {
-  const dir = path.join(process.cwd(), 'data', 'backups');
+  // On Vercel serverless, process.cwd() is read-only — only the DATABASE_PATH
+  // directory (e.g. /tmp on Vercel) is writable. Snapshots live next to the
+  // database file so they work on any platform.
+  const base = process.env.DATABASE_PATH
+    ? path.dirname(process.env.DATABASE_PATH.replace(/\.db$/, '.json'))
+    : path.join(process.cwd(), 'data');
+  const dir = path.join(base, 'backups');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
