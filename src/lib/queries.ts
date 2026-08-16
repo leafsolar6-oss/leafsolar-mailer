@@ -237,6 +237,18 @@ export function setSetting(key: string, value: string): void {
 }
 
 export function getSMTPSettings(): SMTPSettings | null {
+  // Environment variables take priority (persistent on Vercel/VPS)
+  if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+    return {
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS || '',
+      from_name: process.env.SMTP_FROM_NAME || 'Leaf Solar',
+      from_email: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER,
+    };
+  }
   return store.settings.getSMTP();
 }
 

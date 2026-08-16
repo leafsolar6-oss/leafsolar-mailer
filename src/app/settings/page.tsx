@@ -1,228 +1,196 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Mail, Send, CheckCircle, AlertCircle, Info, Smartphone } from 'lucide-react';
+import { Mail, Send, CheckCircle2, AlertCircle, Info, Smartphone, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { SMTPSettings } from '@/types';
+import { offlineFetch } from '@/lib/offline';
 
-const SMTP_PRESETS = [
-  { name: 'Gmail', host: 'smtp.gmail.com', port: 587, secure: false },
-  { name: 'Outlook/Office365', host: 'smtp.office365.com', port: 587, secure: false },
-  { name: 'Yahoo', host: 'smtp.mail.yahoo.com', port: 587, secure: false },
+const PRESETS = [
+  { name: 'Truehost / Cloudoon (your hosting)', host: 'mail.leafsolar.ng', port: 587, secure: false },
+  { name: 'Gmail / Google Workspace', host: 'smtp.gmail.com', port: 587, secure: false },
+  { name: 'Outlook / Office 365', host: 'smtp.office365.com', port: 587, secure: false },
   { name: 'Brevo', host: 'smtp-relay.brevo.com', port: 587, secure: false },
   { name: 'SendGrid', host: 'smtp.sendgrid.net', port: 587, secure: false },
   { name: 'Mailgun', host: 'smtp.mailgun.org', port: 587, secure: false },
-  { name: 'Zoho', host: 'smtp.zoho.com', port: 465, secure: true },
+  { name: 'Zoho Mail', host: 'smtp.zoho.com', port: 465, secure: true },
+  { name: 'Yahoo Mail', host: 'smtp.mail.yahoo.com', port: 587, secure: false },
   { name: 'Custom', host: '', port: 587, secure: false },
 ];
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<SMTPSettings>({
-    host: '', port: 587, secure: false, user: '', pass: '',
+  const [s, setS] = useState<SMTPSettings>({
+    host: 'mail.leafsolar.ng', port: 587, secure: false, user: '', pass: '',
     from_name: 'Leaf Solar', from_email: '',
   });
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; msg?: string } | null>(null);
 
   useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(data => {
-      if (data) setSettings(prev => ({ ...prev, ...data }));
-      setLoading(false);
-    });
+    offlineFetch<SMTPSettings | null>('/api/settings')
+      .then(r => { if (r.data) setS(prev => ({ ...prev, ...r.data })); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const applyPreset = (presetName: string) => {
-    const preset = SMTP_PRESETS.find(p => p.name === presetName);
-    if (preset && preset.host) {
-      setSettings(prev => ({ ...prev, host: preset.host, port: preset.port, secure: preset.secure }));
-    }
+  const applyPreset = (name: string) => {
+    const p = PRESETS.find(x => x.name === name);
+    if (p && p.host) setS(prev => ({ ...prev, host: p.host, port: p.port, secure: p.secure }));
   };
 
   const save = async () => {
-    if (!settings.host || !settings.user || !settings.pass) {
-      toast.error('Host, username, and password are required');
-      return;
-    }
+    if (!s.host || !s.user || !s.pass) return toast.error('Host, username, and password are required');
     setSaving(true);
-    const res = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
+    await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s),
     });
     setSaving(false);
-    if (res.ok) toast.success('Settings saved successfully');
-    else toast.error('Failed to save settings');
+    toast.success('SMTP settings saved');
   };
 
   const test = async () => {
-    setTesting(true);
-    setTestResult(null);
+    setTesting(true); setResult(null);
     const res = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...settings, action: 'test' }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...s, action: 'test' }),
     });
     const data = await res.json();
     setTesting(false);
-    setTestResult(data);
-    if (data.success) toast.success('SMTP connection successful!');
-    else toast.error(data.error || 'Connection failed');
+    setResult({ ok: !!data.success, msg: data.success ? 'Connection successful! Emails will send.' : (data.error || 'Connection failed') });
+    if (data.success) toast.success('SMTP connection works!');
+    else toast.error(data.error || 'Failed');
   };
 
-  if (loading) return <div className="flex justify-center py-20"><div className="spinner" /></div>;
+  if (loading) return <div className="flex justify-center py-16"><div className="spinner" /></div>;
 
   return (
-    <div className="animate-fade-in mt-12 lg:mt-0 max-w-3xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
-        <p className="text-sm text-gray-500">Configure your email sending and app preferences</p>
+    <div className="animate-fade-in max-w-3xl space-y-6">
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Settings</h1>
+        <p className="text-gray-500 text-sm">Configure how emails are sent from your app</p>
       </div>
 
-      {/* SMTP Settings */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+      <div className="card overflow-hidden">
         <div className="p-5 border-b border-gray-100 flex items-center gap-3">
-          <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
-            <Mail className="w-5 h-5 text-green-600" />
+          <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center">
+            <Mail className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <h2 className="font-bold text-gray-800">SMTP Email Settings</h2>
-            <p className="text-sm text-gray-500">Configure the mail server for sending bulk emails</p>
+            <h2 className="font-bold text-gray-900">SMTP Email Server</h2>
+            <p className="text-sm text-gray-500">Your hosting email is pre-configured for Truehost/Cloudoon</p>
           </div>
         </div>
 
-        <div className="p-5 space-y-4">
-          {/* Preset selector */}
+        <div className="p-5 space-y-5">
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-emerald-900">
+              <p className="font-semibold">Recommended: Use your Truehost mailbox</p>
+              <p className="text-emerald-700 mt-0.5">
+                Host is already set to <code className="bg-white/60 px-1.5 py-0.5 rounded">mail.leafsolar.ng</code>.
+                Just enter your full email address (e.g. <code className="bg-white/60 px-1.5 py-0.5 rounded">info@leafsolar.ng</code>) and the password you use to log into webmail.
+              </p>
+            </div>
+          </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Quick Setup</label>
-            <select onChange={e => applyPreset(e.target.value)} defaultValue=""
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 outline-none bg-white">
-              <option value="" disabled>Select your email provider...</option>
-              {SMTP_PRESETS.map(p => (
-                <option key={p.name} value={p.name}>{p.name}</option>
-              ))}
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Quick Setup</label>
+            <select onChange={e => applyPreset(e.target.value)} defaultValue="Truehost / Cloudoon (your hosting)"
+              className="input bg-white">
+              {PRESETS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
             </select>
           </div>
 
-          <div className="grid sm:grid-cols-3 gap-3">
+          <div className="grid sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">SMTP Host *</label>
-              <input value={settings.host} onChange={e => setSettings({ ...settings, host: e.target.value })}
-                placeholder="smtp.example.com"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 outline-none" />
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">SMTP Host</label>
+              <input value={s.host} onChange={e => setS({ ...s, host: e.target.value })}
+                placeholder="mail.leafsolar.ng" className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Port *</label>
-              <input type="number" value={settings.port} onChange={e => setSettings({ ...settings, port: parseInt(e.target.value) || 587 })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 outline-none" />
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Port</label>
+              <input type="number" value={s.port}
+                onChange={e => setS({ ...s, port: parseInt(e.target.value) || 587 })} className="input" />
             </div>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={settings.secure}
-              onChange={e => setSettings({ ...settings, secure: e.target.checked })}
-              className="w-4 h-4 rounded text-green-600 focus:ring-green-500" />
-            <span className="text-sm text-gray-700">Use SSL/TLS (port 465)</span>
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input type="checkbox" checked={s.secure}
+              onChange={e => setS({ ...s, secure: e.target.checked })}
+              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500" />
+            <span className="text-sm text-gray-700">Use SSL/TLS (usually port 465). Leave unchecked for STARTTLS (port 587).</span>
           </label>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
-            <input value={settings.user} onChange={e => setSettings({ ...settings, user: e.target.value })}
-              placeholder="your@email.com or API username"
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 outline-none" />
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address (Username)</label>
+            <input value={s.user} onChange={e => setS({ ...s, user: e.target.value, from_email: s.from_email || e.target.value })}
+              placeholder="info@leafsolar.ng" type="email" className="input" />
+            <p className="text-xs text-gray-400 mt-1">This is the full email you created in cPanel/webmail</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password / API Key *</label>
-            <input type="password" value={settings.pass} onChange={e => setSettings({ ...settings, pass: e.target.value })}
-              placeholder="Your email password or app-specific password"
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 outline-none" />
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
+            <input type="password" value={s.pass} onChange={e => setS({ ...s, pass: e.target.value })}
+              placeholder="Your email account password" className="input" />
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">From Name</label>
-              <input value={settings.from_name} onChange={e => setSettings({ ...settings, from_name: e.target.value })}
-                placeholder="Leaf Solar"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 outline-none" />
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">From Name</label>
+              <input value={s.from_name} onChange={e => setS({ ...s, from_name: e.target.value })}
+                placeholder="Leaf Solar" className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">From Email</label>
-              <input value={settings.from_email} onChange={e => setSettings({ ...settings, from_email: e.target.value })}
-                placeholder="info@leafsolar.ng" type="email"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 outline-none" />
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">From Email</label>
+              <input value={s.from_email} onChange={e => setS({ ...s, from_email: e.target.value })}
+                placeholder="info@leafsolar.ng" type="email" className="input" />
             </div>
           </div>
 
-          {testResult && (
-            <div className={`p-3 rounded-xl flex items-center gap-2 text-sm ${
-              testResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-            }`}>
-              {testResult.success ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-              {testResult.success ? 'SMTP connection verified successfully!' : testResult.error}
+          {result && (
+            <div className={`p-3.5 rounded-xl flex items-start gap-2.5 text-sm ${
+              result.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>
+              {result.ok ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
+              <span>{result.msg}</span>
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <button onClick={test} disabled={testing}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-medium hover:bg-blue-100 disabled:opacity-50">
-              {testing ? <div className="w-5 h-5 spinner" /> : <Send className="w-5 h-5" />}
+              className="btn btn-secondary">
+              {testing ? <div className="spinner !w-4 !h-4" /> : <Send className="w-4 h-4" />}
               Test Connection
             </button>
-            <button onClick={save} disabled={saving}
-              className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 disabled:opacity-50 shadow">
+            <button onClick={save} disabled={saving} className="btn btn-primary">
               {saving ? 'Saving...' : 'Save Settings'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* App Info */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <h2 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <Smartphone className="w-5 h-5 text-green-600" /> Install as Android App (APK)
-        </h2>
-        <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-800 mb-4 flex items-start gap-2">
-          <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-medium mb-1">This is a PWA (Progressive Web App)</p>
-            <p>You can install it directly from Chrome on Android by tapping the menu (⋮) and selecting "Install app". For a standalone APK file, use a PWA-to-APK tool like PWABuilder or Bubblewrap.</p>
-          </div>
-        </div>
-        <div className="text-sm text-gray-600 space-y-3">
-          <div>
-            <p className="font-semibold text-gray-700 mb-1">Option 1 — Install directly (fastest)</p>
-            <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-600">
-              <li>Host this app with HTTPS (Vercel, Netlify, or a VPS)</li>
-              <li>Open the URL in <strong>Chrome on Android</strong></li>
-              <li>Tap menu (⋮) → <strong>Install app</strong></li>
-            </ol>
-          </div>
-          <div>
-            <p className="font-semibold text-gray-700 mb-1">Option 2 — Automatic APK via GitHub (recommended)</p>
-            <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-600">
-              <li>Push this project to GitHub</li>
-              <li>The included <code className="bg-gray-100 px-1 rounded">.github/workflows/android.yml</code> builds a debug APK on every push</li>
-              <li>Download it from the <strong>Actions</strong> tab → latest run → Artifacts</li>
-              <li>Set the <code className="bg-gray-100 px-1 rounded">APP_URL</code> repo variable to your deployed URL</li>
-            </ol>
-          </div>
-          <div>
-            <p className="font-semibold text-gray-700 mb-1">Option 3 — Build locally</p>
-            <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-600">
-              <li>Set <code className="bg-gray-100 px-1 rounded">APP_URL</code> to your deployed URL</li>
-              <li>Run <code className="bg-gray-100 px-1 rounded">npm run apk</code> (requires Android Studio + JDK 17)</li>
-              <li>APK appears in <code className="bg-gray-100 px-1 rounded">android/app/build/outputs/apk/debug/</code></li>
-            </ol>
-          </div>
-          <div>
-            <p className="font-semibold text-gray-700 mb-1">Option 4 — PWABuilder</p>
-            <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-600">
-              <li>Visit <a href="https://www.pwabuilder.com" target="_blank" rel="noopener noreferrer" className="text-green-600 underline">pwabuilder.com</a></li>
-              <li>Enter your deployed URL → Build My PWA → download Android package</li>
-            </ol>
-          </div>
-        </div>
+      <div className="card p-5">
+        <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+          <Info className="w-5 h-5 text-blue-600" /> Where to find your email password
+        </h3>
+        <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+          <li>Log in to your <strong>Truehost/cPanel</strong> account</li>
+          <li>Go to <strong>Email Accounts</strong> → find or create <code>info@leafsolar.ng</code></li>
+          <li>Click <strong>Connect Devices</strong> or <strong>Manage</strong> to see the password, or set a new one</li>
+          <li>Paste that email and password on this page, then tap <strong>Test Connection</strong></li>
+        </ol>
+        <p className="text-xs text-gray-400 mt-3">
+          💡 For better deliverability when sending bulk email, consider using a dedicated service like Brevo (300 free emails/day) — select it from Quick Setup and paste their SMTP key.
+        </p>
+      </div>
+
+      <div className="card p-5">
+        <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+          <Smartphone className="w-5 h-5 text-emerald-600" /> Android App
+        </h3>
+        <p className="text-sm text-gray-600">
+          The app loads from <strong>https://mailer.leafsolar.ng</strong>. Settings saved here apply to both the website and the APK. If you change SMTP later, no reinstall is needed.
+        </p>
       </div>
     </div>
   );
