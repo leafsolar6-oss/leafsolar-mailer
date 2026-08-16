@@ -64,19 +64,20 @@ let cache: DBShape | null = null;
 
 function load(): DBShape {
   if (cache) return cache;
+  let next: DBShape;
   try {
     if (fs.existsSync(FILE)) {
-      cache = JSON.parse(fs.readFileSync(FILE, 'utf-8')) as DBShape;
+      const parsed = JSON.parse(fs.readFileSync(FILE, 'utf-8')) as Partial<DBShape>;
       // Backfill any missing top-level keys
-      const base = emptyDB();
-      cache = { ...base, ...(cache as any) };
+      next = { ...emptyDB(), ...parsed };
     } else {
-      cache = emptyDB();
+      next = emptyDB();
     }
   } catch {
-    cache = emptyDB();
+    next = emptyDB();
   }
-  return cache;
+  cache = next;
+  return next;
 }
 
 function persist() {
