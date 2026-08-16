@@ -6,9 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:android": "next build && npx cap sync android",
+    "open:android": "npx cap open android",
+    "apk": "npm run build:android && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.0",
     "better-sqlite3": "^12.11.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.31.0",
@@ -23,6 +27,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@ducanh2912/next-pwa": "^10.2.9",
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^9.6.0",

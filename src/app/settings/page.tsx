@@ -189,15 +189,39 @@ export default function SettingsPage() {
             <p>You can install it directly from Chrome on Android by tapping the menu (⋮) and selecting "Install app". For a standalone APK file, use a PWA-to-APK tool like PWABuilder or Bubblewrap.</p>
           </div>
         </div>
-        <div className="text-sm text-gray-600 space-y-2">
-          <p><strong>Steps to create APK:</strong></p>
-          <ol className="list-decimal list-inside space-y-1 ml-2">
-            <li>Host this app on a server (Vercel, your VPS, etc.) with HTTPS</li>
-            <li>Visit <a href="https://www.pwabuilder.com" target="_blank" className="text-green-600 underline">PWABuilder.com</a></li>
-            <li>Enter your app URL and click "Start"</li>
-            <li>Click "Build My PWA" then download the Android package</li>
-            <li>Or use <code className="bg-gray-100 px-1 rounded">npx @bubblewrap/cli build</code></li>
-          </ol>
+        <div className="text-sm text-gray-600 space-y-3">
+          <div>
+            <p className="font-semibold text-gray-700 mb-1">Option 1 — Install directly (fastest)</p>
+            <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-600">
+              <li>Host this app with HTTPS (Vercel, Netlify, or a VPS)</li>
+              <li>Open the URL in <strong>Chrome on Android</strong></li>
+              <li>Tap menu (⋮) → <strong>Install app</strong></li>
+            </ol>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-700 mb-1">Option 2 — Automatic APK via GitHub (recommended)</p>
+            <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-600">
+              <li>Push this project to GitHub</li>
+              <li>The included <code className="bg-gray-100 px-1 rounded">.github/workflows/android.yml</code> builds a debug APK on every push</li>
+              <li>Download it from the <strong>Actions</strong> tab → latest run → Artifacts</li>
+              <li>Set the <code className="bg-gray-100 px-1 rounded">APP_URL</code> repo variable to your deployed URL</li>
+            </ol>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-700 mb-1">Option 3 — Build locally</p>
+            <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-600">
+              <li>Set <code className="bg-gray-100 px-1 rounded">APP_URL</code> to your deployed URL</li>
+              <li>Run <code className="bg-gray-100 px-1 rounded">npm run apk</code> (requires Android Studio + JDK 17)</li>
+              <li>APK appears in <code className="bg-gray-100 px-1 rounded">android/app/build/outputs/apk/debug/</code></li>
+            </ol>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-700 mb-1">Option 4 — PWABuilder</p>
+            <ol className="list-decimal list-inside space-y-1 ml-2 text-gray-600">
+              <li>Visit <a href="https://www.pwabuilder.com" target="_blank" rel="noopener noreferrer" className="text-green-600 underline">pwabuilder.com</a></li>
+              <li>Enter your deployed URL → Build My PWA → download Android package</li>
+            </ol>
+          </div>
         </div>
       </div>
     </div>

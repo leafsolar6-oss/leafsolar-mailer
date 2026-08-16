@@ -2,11 +2,16 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-// Ensure data directory exists
-const dataDir = path.join(process.cwd(), 'data');
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+// Database path: respect DATABASE_PATH env var (e.g. /tmp on serverless,
+// ./data/leafsolar.db on a VPS). Falls back to ./data/leafsolar.db.
+const configuredPath = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'leafsolar.db');
+const dbPath = path.isAbsolute(configuredPath)
+  ? configuredPath
+  : path.join(process.cwd(), configuredPath);
 
-const dbPath = path.join(dataDir, 'leafsolar.db');
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+
 const db = new Database(dbPath);
 
 // Enable WAL mode for better performance

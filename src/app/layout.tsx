@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import Sidebar from '@/components/Sidebar';
 import PWARegister from '@/components/PWARegister';
+import InstallPrompt from '@/components/InstallPrompt';
 import { DashboardsProvider } from '@/components/DashboardProvider';
 
 export const metadata: Metadata = {
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
             }}
           />
+          <InstallPrompt />
         </DashboardsProvider>
       </body>
     </html>
