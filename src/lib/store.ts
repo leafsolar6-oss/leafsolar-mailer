@@ -18,6 +18,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { after } from 'next/server';
 import { kvConfigured, kvGet, kvPut } from './kv-persist';
 import { supabaseConfigured, supabaseGet, supabasePut } from './supabase-persist';
 import type {
@@ -119,15 +120,28 @@ function pushSnapshot(value: string): void {
   if (supabaseConfigured()) supabasePut(value).catch(() => { /* unavailable */ });
 }
 
-/** Debounced push of the whole store (skipped until hydrated so a cold-start
- *  seed never overwrites the durable snapshot). */
+/** Push of the whole store (skipped until hydrated so a cold-start seed never
+ *  overwrites the durable snapshot). Runs AFTER the response via Next's
+ *  after() — on Vercel serverless a setTimeout may never fire because the
+ *  function is frozen once the response is sent. Falls back to a debounced
+ *  timer outside a request context (local dev / scripts). */
+let flushScheduled = false;
 function scheduleFlush(): void {
   if (!anyPersistConfigured() || !hydrated) return;
-  if (flushTimer) clearTimeout(flushTimer);
-  flushTimer = setTimeout(() => {
+  if (flushScheduled) return;
+  flushScheduled = true;
+  const doFlush = () => {
+    flushScheduled = false;
     if (!cache) return;
     pushSnapshot(JSON.stringify(cache));
-  }, 800);
+  };
+  try {
+    after(doFlush);
+  } catch {
+    // Outside a request context — use a debounced timer instead.
+    if (flushTimer) clearTimeout(flushTimer);
+    flushTimer = setTimeout(doFlush, 800);
+  }
 }
 
 let readyPromise: Promise<void> | null = null;
