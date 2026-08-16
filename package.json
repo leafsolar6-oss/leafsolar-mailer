@@ -11,6 +11,9 @@
     "open:android": "npx cap open android",
     "apk": "npm run build:android && cd android && ./gradlew assembleDebug"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
     "date-fns": "^4.4.0",

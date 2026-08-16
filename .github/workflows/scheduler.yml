@@ -1,0 +1,34 @@
+name: Scheduler Ping
+
+# Free replacement for Vercel cron (Hobby plan limits Vercel crons to once
+# per day). This workflow calls /api/scheduler every 10 minutes so scheduled
+# campaigns send on time even when nobody has the app open.
+#
+# Setup (one-time):
+#   1. Generate a long random string.
+#   2. Add it as a GitHub repo secret named CRON_SECRET
+#      (Settings -> Secrets and variables -> Actions).
+#   3. Set the SAME value as the CRON_SECRET environment variable in Vercel
+#      (Project -> Settings -> Environment Variables, Production).
+#
+# The endpoint ignores the token for this check only when called by Vercel
+# cron; external callers must present the bearer token.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping-scheduler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping scheduler endpoint
+        run: |
+          curl -sS -o /tmp/scheduler-response.json -w "HTTP %{http_code}\n" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://mailer.leafsolar.ng/api/scheduler"
+          cat /tmp/scheduler-response.json
+          echo ""
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

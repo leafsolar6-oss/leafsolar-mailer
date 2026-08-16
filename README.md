@@ -126,12 +126,23 @@ In Android Studio: **Build → Build Bundle(s) / APK(s) → Build APK(s)**
 ## ⏰ Scheduling & Cron
 
 Scheduled campaigns are auto-sent by:
-1. The in-app poller (every 60s while the app is open), and
-2. The **Vercel cron** (`/api/scheduler` — see `vercel.json`).
-   > Frequent cron schedules (e.g. every 10 minutes) require a paid Vercel plan.
-   > On Hobby, either keep the app open periodically, or call `/api/scheduler`
-   > yourself with `Authorization: Bearer <CRON_SECRET>` (any uptime monitor or
-   > GitHub Action can hit it).
+1. **In-app poller** — checks every 60s while the app is open.
+2. **GitHub Actions scheduler** (`.github/workflows/scheduler.yml`) — pings
+   `/api/scheduler` every 10 minutes even when nobody has the app open. Free on
+   public repos.
+3. **Vercel cron** — only if you're on Pro/Enterprise (Hobby fails the build
+   with any schedule more frequent than once per day; we deliberately leave
+   `crons` out of `vercel.json` for Hobby compatibility).
+
+### To enable the GitHub Actions scheduler
+1. Generate a long random string (e.g. `openssl rand -hex 32`).
+2. Add it as a **GitHub repo secret** named `CRON_SECRET`
+   (Settings → Secrets and variables → Actions).
+3. Set the **same value** as the `CRON_SECRET` environment variable in Vercel
+   (Project → Settings → Environment Variables → Production).
+
+The scheduler endpoint also runs when called manually — you can hit
+`/api/scheduler` with `Authorization: Bearer <CRON_SECRET>` from any cron service.
 
 ## ☁️ Deploying to Vercel
 

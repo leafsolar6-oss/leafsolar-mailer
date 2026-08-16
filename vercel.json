@@ -7,11 +7,5 @@
     "src/app/api/**/route.ts": {
       "maxDuration": 60
     }
-  },
-  "crons": [
-    {
-      "path": "/api/scheduler",
-      "schedule": "*/10 * * * *"
-    }
-  ]
+  }
 }
