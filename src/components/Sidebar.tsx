@@ -4,13 +4,14 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Users, Mail, ListChecks, FileText,
-  Plug, Settings, Menu, X, Send, Wifi, WifiOff
+  Plug, Settings, Menu, X, Send, Wifi, WifiOff, Inbox
 } from 'lucide-react';
 import { flushOutbox, outboxCount } from '@/lib/offline';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/compose', label: 'Compose', icon: Send },
+  { href: '/inbox', label: 'Inbox', icon: Inbox },
   { href: '/campaigns', label: 'Campaigns', icon: Mail },
   { href: '/contacts', label: 'Contacts', icon: Users },
   { href: '/lists', label: 'Lists', icon: ListChecks },
