@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
-import Sidebar from '@/components/Sidebar';
+import AppShell from '@/components/AppShell';
 import PWARegister from '@/components/PWARegister';
 import InstallPrompt from '@/components/InstallPrompt';
 import SchedulerPoller from '@/components/SchedulerPoller';
@@ -41,14 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <PWARegister />
         <SchedulerPoller />
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 lg:ml-[286px] safe-top safe-bottom">
-            <div className="p-4 lg:p-10 max-w-7xl mx-auto pb-28 lg:pb-10 pt-20 lg:pt-10">
-              {children}
-            </div>
-          </main>
-        </div>
+        <AppShell>{children}</AppShell>
         <Toaster position="top-center" toastOptions={{
           duration: 3200,
           style: {
