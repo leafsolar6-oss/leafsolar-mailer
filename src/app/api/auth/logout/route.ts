@@ -1,12 +1,14 @@
-import { NextResponse } from 'next/server';
-import { destroySession, clearSessionCookie } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { destroySession, clearSessionCookie, getTokenFromRequest } from '@/lib/auth';
 import { whenStoreReady, flushNow } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST() {
+/** POST /api/auth/logout — ends the CURRENT session (others stay signed in). */
+export async function POST(req: NextRequest) {
   await whenStoreReady();
-  destroySession();
+  const token = getTokenFromRequest(req);
+  destroySession(token);
   await flushNow();
   return clearSessionCookie(NextResponse.json({ success: true }));
 }

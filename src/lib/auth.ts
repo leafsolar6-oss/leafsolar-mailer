@@ -2,10 +2,11 @@
  * Lightweight single-admin authentication.
  *
  * No external auth provider needed — the admin account is created on first
- * run via the /welcome setup page. Passwords are salted + SHA-256 hashed
- * (never stored in plain text). Sessions are a random 256-bit token kept in
- * the JSON store and delivered as an httpOnly cookie, so the token never
- * leaks to JavaScript.
+ * setup. Passwords are salted + SHA-256 hashed (never stored in plain text).
+ * Sessions are random 256-bit tokens kept in the JSON store and delivered as
+ * httpOnly cookies, so tokens never leak to JavaScript. Multiple concurrent
+ * sessions are supported (up to 10), so logging in on another device doesn't
+ * invalidate this one.
  */
 import crypto from 'crypto';
 import store, { whenStoreReady } from './store';
@@ -83,25 +84,50 @@ export function resetPasswordWithToken(
   return { ok: true };
 }
 
+const MAX_SESSIONS = 10;
+
+/** All valid session tokens (a set, so multiple devices stay signed in). */
+export function getSessionTokens(): string[] {
+  const raw = store.settings.get('session_tokens');
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return arr.filter(Boolean);
+    } catch { /* fall through to legacy */ }
+  }
+  // Migrate the legacy single-token key.
+  const legacy = store.settings.get('session_token');
+  return legacy ? [legacy] : [];
+}
+
+function setSessionTokens(tokens: string[]): void {
+  store.settings.set('session_tokens', JSON.stringify(tokens.slice(-MAX_SESSIONS)));
+}
+
 export function createSessionToken(): string {
   const token = crypto.randomBytes(32).toString('hex');
-  store.settings.set('session_token', token);
+  const tokens = getSessionTokens();
+  tokens.push(token);
+  setSessionTokens(tokens);
   return token;
 }
 
 export function validateToken(token: string | null | undefined): boolean {
   if (!token) return false;
-  const current = store.settings.get('session_token');
-  if (!current) return false;
-  // constant-time-ish compare
-  const a = Buffer.from(token);
-  const b = Buffer.from(current);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  const tokens = getSessionTokens();
+  if (!tokens.length) return false;
+  const buf = Buffer.from(token);
+  if (buf.length !== 64) return false; // tokens are 64 hex chars
+  return tokens.some(t => {
+    const b = Buffer.from(t);
+    return b.length === buf.length && crypto.timingSafeEqual(b, buf);
+  });
 }
 
-export function destroySession(): void {
-  store.settings.set('session_token', '');
+/** Removes a specific session (or all when no token is given). */
+export function destroySession(token?: string | null): void {
+  if (!token) { setSessionTokens([]); return; }
+  setSessionTokens(getSessionTokens().filter(t => t !== token));
 }
 
 export function getTokenFromRequest(req: Request): string | null {

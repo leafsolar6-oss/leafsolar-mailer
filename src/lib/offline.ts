@@ -102,6 +102,17 @@ export function isOnline(): boolean {
   return navigator.onLine;
 }
 
+/** Redirects to the login page when the server says the session is invalid.
+ *  Must NOT fall back to cached data in that case, or the app keeps looking
+ *  logged in while every write fails with "Authentication required". */
+function handleUnauthorized(res: Response): void {
+  if (res.status === 401 && typeof window !== 'undefined') {
+    const next = window.location.pathname + window.location.search;
+    window.location.href = `/login?next=${encodeURIComponent(next)}`;
+    throw new Error('Session expired — please sign in again.');
+  }
+}
+
 /**
  * Fetch with offline fallback for GET requests.
  */
@@ -116,11 +127,14 @@ export async function offlineFetch<T = any>(
     if (isOnline()) {
       try {
         const res = await fetch(url, options);
+        if (res.status === 401) handleUnauthorized(res);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         await cacheSet(cacheKey, data);
         return { data, fromCache: false };
-      } catch {
+      } catch (e: any) {
+        // A session error was already handled (redirect to login) — rethrow.
+        if (e?.message?.includes('Session expired')) throw e;
         const cached = await cacheGet(cacheKey);
         if (cached) return { data: cached, fromCache: true };
         throw new Error('Network unavailable and no cached data');
@@ -146,6 +160,7 @@ export async function offlineFetch<T = any>(
   }
 
   const res = await fetch(url, options);
+  if (res.status === 401) handleUnauthorized(res);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
   return { data, fromCache: false };
