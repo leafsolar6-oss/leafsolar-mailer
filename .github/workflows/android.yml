@@ -1,7 +1,9 @@
 name: Build Android APK
 
-# Builds a debug APK automatically on every push to main, or manually.
-# The APK wraps your hosted web app (set APP_URL below / in repo secrets).
+# Builds a debug APK on every push to main, or manually.
+# The APK loads your hosted web app from APP_URL, so make sure the app is
+# deployed first (e.g. on Vercel). Set APP_URL in repo Settings >
+# Secrets and variables > Actions > Variables, or pass it on manual run.
 on:
   push:
     branches: [main]
@@ -24,7 +26,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Setup Java
@@ -39,24 +41,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js
-        run: npm run build
-        env:
-          DATABASE_PATH: /tmp/leafsolar.db
-
-      - name: Set APP_URL
+      - name: Resolve APP_URL
+        id: appurl
         run: |
           URL="${{ github.event.inputs.app_url || vars.APP_URL || secrets.APP_URL || 'https://leafsolar-mailer.vercel.app' }}"
-          echo "APP_URL=$URL" >> $GITHUB_ENV
-          echo "Using APP_URL=$URL"
+          echo "value=$URL" >> "$GITHUB_OUTPUT"
+          echo "APP_URL=$URL"
 
       - name: Add Android platform (Capacitor)
         run: |
           npm install @capacitor/android
           npx cap add android || echo "Android platform already exists"
-          npx cap sync android
         env:
-          APP_URL: ${{ env.APP_URL }}
+          APP_URL: ${{ steps.appurl.outputs.value }}
+
+      - name: Sync web shell into Android project
+        run: npx cap sync android
+        env:
+          APP_URL: ${{ steps.appurl.outputs.value }}
 
       - name: Build debug APK
         working-directory: android

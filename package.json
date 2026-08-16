@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build:android": "next build && npx cap sync android",
+    "build:android": "npx cap sync android",
     "open:android": "npx cap open android",
     "apk": "npm run build:android && cd android && ./gradlew assembleDebug"
   },

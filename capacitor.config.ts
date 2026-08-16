@@ -20,7 +20,7 @@ const appUrl = process.env.APP_URL || 'https://leafsolar-mailer.vercel.app';
 const config: CapacitorConfig = {
   appId: 'ng.leafsolar.mailer',
   appName: 'Leaf Solar Mailer',
-  webDir: 'out',
+  webDir: 'www',
   backgroundColor: '#f0fdf4',
   android: {
     allowMixedContent: false,
