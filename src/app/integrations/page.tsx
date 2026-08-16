@@ -31,6 +31,17 @@ const PLATFORMS: Platform[] = [
     docs: 'https://developers.facebook.com/docs/marketing-api/guides/lead-ads/',
   },
   {
+    id: 'instagram', name: 'Instagram Lead Ads', category: 'social',
+    description: 'Sync leads from Instagram lead generation ads (via Meta)',
+    brand: '◉',
+    gradient: 'from-fuchsia-500 via-pink-500 to-amber-400',
+    fields: [
+      { key: 'access_token', label: 'Page Access Token', type: 'password', placeholder: 'EAAxxxxx...', help: 'Same token as Facebook — Instagram leads appear via your Page' },
+      { key: 'server_prefix', label: 'Facebook Page ID', type: 'text', placeholder: '123456789012345', help: 'The Facebook Page linked to your Instagram business account' },
+    ],
+    docs: 'https://developers.facebook.com/docs/marketing-api/guides/lead-ads/',
+  },
+  {
     id: 'tiktok', name: 'TikTok Business', category: 'social',
     description: 'Sync leads from TikTok Lead Generation ads',
     brand: '♪',
@@ -40,6 +51,85 @@ const PLATFORMS: Platform[] = [
       { key: 'server_prefix', label: 'Advertiser ID', type: 'text', placeholder: '1234567890' },
     ],
     docs: 'https://business-api.tiktok.com/portal/docs?id=1739584855420929',
+  },
+  {
+    id: 'linkedin', name: 'LinkedIn Lead Gen', category: 'social',
+    description: 'Import leads from LinkedIn Sponsored Content lead forms',
+    brand: 'in',
+    gradient: 'from-sky-600 to-blue-800',
+    fields: [
+      { key: 'api_key', label: 'Access Token', type: 'password', placeholder: 'AQVA...', help: 'OAuth token with r_ads_lead_access scope' },
+      { key: 'server_prefix', label: 'Ad Account ID', type: 'text', placeholder: '123456789', help: 'Numeric LinkedIn Ad Account ID' },
+    ],
+    docs: 'https://learn.microsoft.com/en-us/linkedin/marketing/lead-gen',
+  },
+  {
+    id: 'twitter', name: 'X (Twitter) Ads', category: 'social',
+    description: 'Pull leads from X Lead Generation Cards',
+    brand: '𝕏',
+    gradient: 'from-gray-800 to-black',
+    fields: [
+      { key: 'api_key', label: 'API Key (Consumer Key)', type: 'password', placeholder: 'Consumer key from your X app' },
+      { key: 'refresh_token', label: 'API Secret (Consumer Secret)', type: 'password', placeholder: 'Consumer secret' },
+      { key: 'access_token', label: 'Access Token', type: 'password', placeholder: 'OAuth access token' },
+      { key: 'api_secret', label: 'Access Token Secret', type: 'password', placeholder: 'OAuth token secret' },
+      { key: 'server_prefix', label: 'Ads Account ID', type: 'text', placeholder: '18ce24y...' },
+    ],
+    docs: 'https://developer.x.com/en/docs/x-ads-api/lead-generation',
+  },
+  {
+    id: 'youtube', name: 'YouTube Lead Forms', category: 'social',
+    description: 'Import leads from YouTube video lead forms',
+    brand: '▶',
+    gradient: 'from-red-500 to-red-700',
+    fields: [
+      { key: 'access_token', label: 'OAuth Access Token', type: 'password', placeholder: 'ya29...', help: 'Google OAuth token with YouTube scope' },
+      { key: 'server_prefix', label: 'Channel ID (optional)', type: 'text', placeholder: 'UC...' },
+    ],
+    docs: 'https://www.youtube.com/ads/',
+  },
+  {
+    id: 'pinterest', name: 'Pinterest Ads', category: 'social',
+    description: 'Sync leads from Pinterest Pin lead ads',
+    brand: 'P',
+    gradient: 'from-red-600 to-rose-700',
+    fields: [
+      { key: 'access_token', label: 'Access Token', type: 'password', placeholder: 'pina_...' },
+      { key: 'server_prefix', label: 'Ad Account ID', type: 'text', placeholder: '123456789012' },
+    ],
+    docs: 'https://developers.pinterest.com/docs/api/v5/',
+  },
+  {
+    id: 'snapchat', name: 'Snapchat Ads', category: 'social',
+    description: 'Import leads from Snapchat Lead Generation ads',
+    brand: '👻',
+    gradient: 'from-yellow-300 to-yellow-500',
+    fields: [
+      { key: 'access_token', label: 'Access Token', type: 'password', placeholder: 'Bearer token' },
+      { key: 'server_prefix', label: 'Ad Account ID', type: 'text', placeholder: '123a45bc-...' },
+    ],
+    docs: 'https://marketingapi.snapchat.com/docs/',
+  },
+  {
+    id: 'whatsapp', name: 'WhatsApp Business', category: 'social',
+    description: 'Import contacts who messaged your WhatsApp Business number',
+    brand: 'W',
+    gradient: 'from-green-500 to-emerald-600',
+    fields: [
+      { key: 'access_token', label: 'Permanent System Token', type: 'password', placeholder: 'EAAxxxxx...', help: 'From Meta Business Settings' },
+      { key: 'server_prefix', label: 'Phone Number ID', type: 'text', placeholder: '10584789...', help: 'WhatsApp Business Phone Number ID' },
+    ],
+    docs: 'https://developers.facebook.com/docs/whatsapp/cloud-api',
+  },
+  {
+    id: 'telegram', name: 'Telegram Bot', category: 'social',
+    description: 'Collect contacts who start a chat with your Telegram bot',
+    brand: '✈',
+    gradient: 'from-sky-400 to-blue-600',
+    fields: [
+      { key: 'api_key', label: 'Bot Token', type: 'text', placeholder: '123456:ABC-DEF...', help: 'From @BotFather' },
+    ],
+    docs: 'https://core.telegram.org/bots/features#botfather',
   },
   {
     id: 'mailchimp', name: 'Mailchimp', category: 'email',
@@ -70,7 +160,7 @@ const PLATFORMS: Platform[] = [
     fields: [
       { key: 'access_token', label: 'Private App Access Token', type: 'password', placeholder: 'pat-na1-...' },
     ],
-    docs: 'https://app.hubspot.com/private-apps',
+    docs: 'https://developers.hubspot.com/docs/api/private-apps',
   },
   {
     id: 'mailgun', name: 'Mailgun', category: 'email',

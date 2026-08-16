@@ -117,6 +117,14 @@ export function addContactsToList(listId: string, contactIds: string[]): number 
   return store.lists.addContacts(listId, contactIds);
 }
 
+export function removeContactsFromList(listId: string, contactIds: string[]): number {
+  return store.lists.removeContacts(listId, contactIds);
+}
+
+export function updateListMeta(id: string, patch: Partial<EmailList>): void {
+  store.lists.update(id, patch);
+}
+
 export function deleteList(id: string): void {
   store.lists.remove(id);
 }
@@ -282,9 +290,13 @@ export function addEmailLog(log: Partial<EmailLog>): EmailLog {
 
 export function getStats(): CampaignStats {
   const campaigns = getCampaigns();
+  // Count every successfully sent email from the delivery logs
+  // (covers both single Compose emails and bulk campaigns).
+  const logs = store.logs.all(undefined, 100000);
+  const totalSent = logs.filter(l => l.status === 'sent').length;
   return {
     totalCampaigns: campaigns.length,
-    totalSent: campaigns.reduce((s, c) => s + (c.sent_count || 0), 0),
+    totalSent,
     totalContacts: getContactCount(),
     totalLists: getLists().length,
     recentCampaigns: campaigns.slice(0, 5),

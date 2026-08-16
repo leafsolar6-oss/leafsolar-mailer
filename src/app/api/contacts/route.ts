@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getContacts, addContact, bulkAddContacts, deleteContact } from '@/lib/queries';
+import { getContacts, addContact, bulkAddContacts, deleteContact, addContactsToList } from '@/lib/queries';
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,9 +16,21 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Bulk import
+    // Bulk import (optionally assign to a list via listId)
     if (Array.isArray(body.contacts)) {
       const result = bulkAddContacts(body.contacts);
+      if (body.listId && result.success > 0) {
+        const emails = new Set(
+          (body.contacts as any[])
+            .map((c: any) => (c.email || '').toLowerCase().trim())
+            .filter(Boolean)
+        );
+        const imported = getContacts();
+        const ids = imported
+          .filter(c => emails.has(c.email.toLowerCase()))
+          .map(c => c.id);
+        if (ids.length) addContactsToList(body.listId, ids);
+      }
       return NextResponse.json(result);
     }
 

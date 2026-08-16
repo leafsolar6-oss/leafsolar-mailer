@@ -168,6 +168,20 @@ const store = {
       persist();
       return count;
     },
+    removeContacts(listId: string, contactIds: string[]): number {
+      const db = load();
+      const removeSet = new Set(contactIds);
+      const before = db.list_contacts.length;
+      db.list_contacts = db.list_contacts.filter(
+        lc => !(lc.list_id === listId && removeSet.has(lc.contact_id))
+      );
+      const removed = before - db.list_contacts.length;
+      const total = db.list_contacts.filter(lc => lc.list_id === listId).length;
+      const l = db.email_lists.find(x => x.id === listId);
+      if (l) l.contact_count = total;
+      persist();
+      return removed;
+    },
   },
 
   // ---------------- campaigns ----------------
