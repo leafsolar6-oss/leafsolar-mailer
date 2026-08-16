@@ -8,7 +8,7 @@ import { requireAuth } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     const search = req.nextUrl.searchParams.get('search') || undefined;
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     const body = await req.json();
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     const body = await req.json();
@@ -80,7 +80,7 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     const body = await req.json();

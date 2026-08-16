@@ -17,6 +17,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { kvConfigured, kvGet, kvPut } from './kv-persist';
 import type {
   Contact, EmailList, Campaign, Template, Integration,
   EmailLog, SMTPSettings, OutboxItem, TrackingEvent,
@@ -66,6 +67,82 @@ function dbFilePath(): string {
 const FILE = dbFilePath();
 let cache: DBShape | null = null;
 
+// --- Vercel KV mirroring -----------------------------------------------------
+// Hooks run once the store is ready (after hydrate on cold starts) so things
+// like template seeding can re-apply over KV data idempotently.
+const READY_HOOKS: Array<() => void> = [];
+export function onStoreReady(fn: () => void): void {
+  READY_HOOKS.push(fn);
+}
+
+let hydrated = false;
+let hydrateStarted = false;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function runReadyHooks(): void {
+  for (const fn of READY_HOOKS) {
+    try { fn(); } catch { /* non-fatal */ }
+  }
+}
+
+function writeFile(): void {
+  if (!cache) return;
+  try {
+    fs.mkdirSync(path.dirname(FILE), { recursive: true });
+    fs.writeFileSync(FILE, JSON.stringify(cache, null, 2));
+  } catch {
+    // On read-only filesystems we keep in-memory state.
+  }
+}
+
+/** Debounced push of the whole store to Vercel KV (skipped until hydrated so
+ *  a cold-start seed never overwrites the KV snapshot). */
+function scheduleKvFlush(): void {
+  if (!kvConfigured() || !hydrated) return;
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = setTimeout(() => {
+    if (!cache) return;
+    kvPut(JSON.stringify(cache)).catch(() => { /* KV unavailable */ });
+  }, 800);
+}
+
+let readyPromise: Promise<void> | null = null;
+
+/** Hydrates the store from Vercel KV (once). Resolves when ready. */
+function hydrate(): Promise<void> {
+  if (!readyPromise) {
+    readyPromise = (async () => {
+      if (!kvConfigured()) {
+        hydrated = true;
+        return;
+      }
+      try {
+        const raw = await kvGet();
+        if (raw) {
+          let parsed: Partial<DBShape> = {};
+          try { parsed = JSON.parse(raw); } catch { /* invalid snapshot */ }
+          cache = { ...emptyDB(), ...parsed };
+          writeFile();
+          runReadyHooks(); // re-seed any templates missing from the KV snapshot
+        }
+        // KV empty -> keep current cache (already seeded); flush below persists it.
+      } catch {
+        // KV unavailable — fall back to in-memory/file store.
+      } finally {
+        hydrated = true;
+        scheduleKvFlush();
+      }
+    })();
+  }
+  return readyPromise;
+}
+
+/** Await before reading/writing the store on cold starts so the first request
+ *  sees KV data (otherwise the first request can race hydration). */
+export function whenStoreReady(): Promise<void> {
+  return hydrate();
+}
+
 function load(): DBShape {
   if (cache) return cache;
   let next: DBShape;
@@ -81,17 +158,19 @@ function load(): DBShape {
     next = emptyDB();
   }
   cache = next;
+  writeFile();
+  runReadyHooks();
+  if (!hydrateStarted) {
+    hydrateStarted = true;
+    void hydrate();
+  }
   return next;
 }
 
 function persist() {
   if (!cache) return;
-  try {
-    fs.mkdirSync(path.dirname(FILE), { recursive: true });
-    fs.writeFileSync(FILE, JSON.stringify(cache, null, 2));
-  } catch {
-    // On read-only filesystems we keep in-memory state.
-  }
+  writeFile();
+  scheduleKvFlush();
 }
 
 const store = {

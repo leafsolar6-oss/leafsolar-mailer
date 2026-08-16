@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  * and posts them here when back online.
  */
 export async function POST(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     const body = await req.json();
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
 // Allow the client to register an outbox item id even before sending
 export async function PUT(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   const body = await req.json();
   const item = {

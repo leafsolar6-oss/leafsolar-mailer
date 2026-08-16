@@ -10,7 +10,7 @@ const CLOUD_URL_KEY = 'cloud_backup_url';
 
 /** POST /api/backup/cloud — push a fresh backup to the configured cloud webhook. */
 export async function POST(req: NextRequest) {
-  if (!requireAuth(req)) {
+  if (!(await requireAuth(req))) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
   try {
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
 /** PUT /api/backup/cloud — save the cloud webhook URL. */
 export async function PUT(req: NextRequest) {
-  if (!requireAuth(req)) {
+  if (!(await requireAuth(req))) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
   try {
@@ -51,7 +51,7 @@ export async function PUT(req: NextRequest) {
 
 /** GET /api/backup/cloud — current cloud webhook URL (masked). */
 export async function GET(req: NextRequest) {
-  if (!requireAuth(req)) {
+  if (!(await requireAuth(req))) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
   return NextResponse.json({ url: getSetting(CLOUD_URL_KEY) || '' });

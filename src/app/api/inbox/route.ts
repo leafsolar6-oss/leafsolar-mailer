@@ -6,7 +6,7 @@ import { requireAuth } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   const folder = req.nextUrl.searchParams.get('folder') || 'INBOX';
   const limit = parseInt(req.nextUrl.searchParams.get('limit') || '30');
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     const body = await req.json();

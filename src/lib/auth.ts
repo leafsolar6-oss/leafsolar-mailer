@@ -8,7 +8,7 @@
  * leaks to JavaScript.
  */
 import crypto from 'crypto';
-import store from './store';
+import store, { whenStoreReady } from './store';
 
 export const SESSION_COOKIE = 'ls_session';
 const SESSION_DAYS = 30;
@@ -90,7 +90,8 @@ export function getTokenFromRequest(req: Request): string | null {
 }
 
 /** Guards an API route. Returns false (caller should 401) when not authed. */
-export function requireAuth(req: Request): boolean {
+export async function requireAuth(req: Request): Promise<boolean> {
+  await whenStoreReady(); // avoid reading pre-hydration state on cold starts
   return validateToken(getTokenFromRequest(req));
 }
 

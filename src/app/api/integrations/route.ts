@@ -3,7 +3,7 @@ import { getIntegrations, upsertIntegration, bulkAddContacts } from '@/lib/queri
 import { requireAuth } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     return NextResponse.json(getIntegrations());
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     const body = await req.json();

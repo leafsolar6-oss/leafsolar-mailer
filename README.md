@@ -127,9 +127,39 @@ In Android Studio: **Build → Build Bundle(s) / APK(s) → Build APK(s)**
 
 Scheduled campaigns are auto-sent by:
 1. The in-app poller (every 60s while the app is open), and
-2. The **Vercel cron** (`/api/scheduler` every 10 minutes — see `vercel.json`).
+2. The **Vercel cron** (`/api/scheduler` — see `vercel.json`).
+   > Frequent cron schedules (e.g. every 10 minutes) require a paid Vercel plan.
+   > On Hobby, either keep the app open periodically, or call `/api/scheduler`
+   > yourself with `Authorization: Bearer <CRON_SECRET>` (any uptime monitor or
+   > GitHub Action can hit it).
 
-Self-hosting without Vercel cron? Call `/api/scheduler` with `Authorization: Bearer <CRON_SECRET>` on your own schedule.
+## ☁️ Deploying to Vercel
+
+1. **Push to GitHub** — Vercel imports the repo and auto-detects Next.js.
+2. **Create Vercel KV** (recommended for durable data): Dashboard → **Storage →
+   Create Database → KV (Upstash)**. Copy the REST URL + token.
+3. **Add environment variables** in Project → Settings → Environment Variables
+   (Production):
+
+   | Variable | Value |
+   |----------|-------|
+   | `APP_URL` | `https://mailer.leafsolar.ng` |
+   | `DATABASE_PATH` | `/tmp/leafsolar-data.json` |
+   | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM_NAME` / `SMTP_FROM_EMAIL` | your Truehost/Cloudoon mailbox |
+   | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | from your Vercel KV |
+   | `CRON_SECRET` | a long random string |
+
+4. **Redeploy.** On first visit you'll be taken to the **Welcome** page — create
+   your admin account (this unlocks the app).
+
+> **Why Vercel KV?** On serverless, the file system is read-only except `/tmp`,
+> which is wiped between cold starts. When `KV_REST_API_URL`/`KV_REST_API_TOKEN`
+> are set, the app mirrors the whole JSON store to a single KV key
+> (`leafsolar:data`) — hydrated on cold start, flushed after writes. Without KV
+> the app still works locally and on a VPS (persistent `./data/` folder), and on
+> Vercel it degrades to per-instance memory (data resets).
+
+## 🛠 Tech Stack
 
 ## 🛠 Tech Stack
 - **Framework:** Next.js 16 (App Router), React 19, TypeScript

@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 /** POST /api/backup/restore — replaces the whole store with an uploaded backup. */
 export async function POST(req: NextRequest) {
-  if (!requireAuth(req)) {
+  if (!(await requireAuth(req))) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
   try {

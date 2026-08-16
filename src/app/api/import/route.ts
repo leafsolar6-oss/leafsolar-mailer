@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { requireAuth } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     const formData = await req.formData();

@@ -15,7 +15,7 @@ export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const isCron = req.headers.get('x-vercel-cron') === '1' ||
     req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET || ''}`;
-  if (!isCron && !requireAuth(req)) {
+  if (!isCron && !(await requireAuth(req))) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 

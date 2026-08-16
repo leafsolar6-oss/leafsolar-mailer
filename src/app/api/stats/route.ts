@@ -3,7 +3,7 @@ import { getStats } from '@/lib/queries';
 import { requireAuth } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     const stats = getStats();

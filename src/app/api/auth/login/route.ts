@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   isAuthConfigured, verifyCredentials, createSessionToken, applySessionCookie,
 } from '@/lib/auth';
+import { whenStoreReady } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    await whenStoreReady();
     if (!isAuthConfigured()) {
       return NextResponse.json({ error: 'No admin account yet. Set one up on the welcome page.' }, { status: 400 });
     }

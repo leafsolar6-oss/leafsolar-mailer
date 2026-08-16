@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
  * stays "scheduled" (the scheduler auto-sends it when the time comes).
  */
 export async function POST(req: NextRequest) {
-  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
     const { campaignId } = await req.json();

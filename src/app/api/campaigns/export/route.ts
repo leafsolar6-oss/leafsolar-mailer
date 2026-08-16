@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 /** GET /api/campaigns/export?campaignId=... — CSV delivery report (with analytics). */
 export async function GET(req: NextRequest) {
-  if (!requireAuth(req)) {
+  if (!(await requireAuth(req))) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
   const campaignId = req.nextUrl.searchParams.get('campaignId') || undefined;

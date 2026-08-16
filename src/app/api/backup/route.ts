@@ -15,7 +15,7 @@ export const runtime = 'nodejs';
  *  - POST /api/backup             -> create a dated snapshot on the server
  */
 export async function GET(req: NextRequest) {
-  if (!requireAuth(req)) {
+  if (!(await requireAuth(req))) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
   try {
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!requireAuth(req)) {
+  if (!(await requireAuth(req))) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
   try {

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import store from './store';
+import store, { onStoreReady } from './store';
 import type {
   Contact, EmailList, Campaign, Template,
   Integration, EmailLog, SMTPSettings, ImportResult, CampaignStats, TrackingEvent,
@@ -542,3 +542,10 @@ export function seedTemplateLibrary(): void {
 
 seedDefaultTemplates();
 seedTemplateLibrary();
+
+// Re-apply seeding once the store is hydrated from Vercel KV on cold starts
+// (idempotent — never overwrites user data or customised templates).
+onStoreReady(() => {
+  seedDefaultTemplates();
+  seedTemplateLibrary();
+});
