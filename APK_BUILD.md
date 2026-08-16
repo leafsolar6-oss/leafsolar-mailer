@@ -1,3 +1,0 @@
-# APK Build
-
-Test file.
