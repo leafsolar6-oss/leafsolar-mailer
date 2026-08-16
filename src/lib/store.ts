@@ -19,7 +19,7 @@ import fs from 'fs';
 import path from 'path';
 import type {
   Contact, EmailList, Campaign, Template, Integration,
-  EmailLog, SMTPSettings,
+  EmailLog, SMTPSettings, OutboxItem,
 } from '@/types';
 
 interface DBShape {
@@ -31,6 +31,7 @@ interface DBShape {
   integrations: Integration[];
   settings: Record<string, string>;
   email_logs: EmailLog[];
+  outbox: OutboxItem[];
 }
 
 function emptyDB(): DBShape {
@@ -43,6 +44,7 @@ function emptyDB(): DBShape {
     integrations: [],
     settings: {},
     email_logs: [],
+    outbox: [],
   };
 }
 
@@ -259,6 +261,28 @@ const store = {
     },
     setSMTP(s: SMTPSettings): void {
       this.set('smtp', JSON.stringify(s));
+    },
+  },
+
+  // ---------------- outbox (offline queue) ----------------
+  outbox: {
+    all(): OutboxItem[] {
+      return load().outbox.slice().sort((a, b) =>
+        (a.created_at || '').localeCompare(b.created_at || '')
+      );
+    },
+    add(item: OutboxItem): void {
+      load().outbox.push(item);
+      persist();
+    },
+    remove(id: string): void {
+      const db = load();
+      db.outbox = db.outbox.filter(o => o.id !== id);
+      persist();
+    },
+    clear(): void {
+      load().outbox = [];
+      persist();
     },
   },
 

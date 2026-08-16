@@ -38,6 +38,16 @@ export interface Campaign {
   updated_at: string;
 }
 
+export interface SingleEmail {
+  to: string;
+  to_name?: string;
+  subject: string;
+  body: string;
+  sender_name?: string;
+  sender_email?: string;
+  reply_to?: string;
+}
+
 export interface Template {
   id: string;
   name: string;
@@ -69,7 +79,7 @@ export interface EmailLog {
   contact_email: string;
   contact_name: string;
   subject: string;
-  status: 'pending' | 'sent' | 'failed';
+  status: 'pending' | 'sent' | 'failed' | 'queued';
   error: string;
   sent_at: string | null;
   created_at: string;
@@ -98,4 +108,12 @@ export interface CampaignStats {
   totalContacts: number;
   totalLists: number;
   recentCampaigns: Campaign[];
+}
+
+export interface OutboxItem {
+  id: string;
+  type: string;
+  payload: unknown;
+  created_at: string;
+  attempts: number;
 }

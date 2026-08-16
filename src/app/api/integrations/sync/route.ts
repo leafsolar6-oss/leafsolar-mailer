@@ -136,6 +136,105 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case 'facebook': {
+        // Facebook / Meta Lead Ads
+        // Requires a Page access token with leads_read permission and the Page ID.
+        const pageId = integration.server_prefix
+          || (integration.config as any)?.page_id
+          || 'me';
+        const token = integration.access_token || integration.api_key;
+        // Fetch leadgen forms for the page
+        const formsRes = await fetch(
+          `https://graph.facebook.com/v21.0/${pageId}/leadgen_forms?limit=100&fields=id,name,locale&access_token=${encodeURIComponent(token)}`
+        );
+        if (!formsRes.ok) {
+          const t = await formsRes.text();
+          throw new Error(`Facebook API error ${formsRes.status}: ${t.slice(0, 200)}`);
+        }
+        const formsData = await formsRes.json();
+        for (const form of formsData.data || []) {
+          let after = '';
+          // Paginate leads per form
+          for (let page = 0; page < 20; page++) {
+            const url = `https://graph.facebook.com/v21.0/${form.id}/leads?limit=500&fields=created_time,field_data,id${after ? `&after=${after}` : ''}&access_token=${encodeURIComponent(token)}`;
+            const leadsRes = await fetch(url);
+            if (!leadsRes.ok) break;
+            const leadsPage = await leadsRes.json();
+            for (const lead of leadsPage.data || []) {
+              const fields: Record<string, string> = {};
+              for (const f of lead.field_data || []) {
+                fields[(f.name || '').toLowerCase()] = Array.isArray(f.values) ? f.values.join(' ') : (f.values || '');
+              }
+              const email = fields.email || fields.email_address || fields['work email'] || fields['e-mail'];
+              const phone = fields.phone_number || fields.phone || fields['phone number'] || '';
+              const fullName = fields.full_name || [fields['first name'], fields['last name']].filter(Boolean).join(' ') || fields.name || '';
+              if (email) {
+                leads.push({
+                  email,
+                  name: fullName,
+                  company: fields.company || fields['company name'] || '',
+                  phone,
+                  source: 'facebook',
+                  tags: ['facebook', form.name || 'lead-ad'],
+                });
+              }
+            }
+            const paging = leadsPage.paging?.cursors?.after;
+            if (!paging || !leadsPage.data?.length) break;
+            after = paging;
+          }
+        }
+        break;
+      }
+
+      case 'tiktok': {
+        // TikTok Business / Marketing API leads
+        // Requires advertiser ID in server_prefix (e.g. 1234567890) and an access token
+        // with leads.read scope.
+        const advertiserId = integration.server_prefix || (integration.config as any)?.advertiser_id;
+        const token = integration.access_token || integration.api_key;
+        if (!advertiserId) throw new Error('TikTok advertiser ID is required (set it in Server Prefix)');
+
+        // First, list lead ads / forms under the advertiser
+        const formsRes = await fetch(
+          `https://business-api.tiktok.com/open_api/v1.3/lead/list/`,
+          {
+            method: 'POST',
+            headers: {
+              'Access-Token': token,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              advertiser_id: advertiserId,
+              page: 1,
+              page_size: 100,
+            }),
+          }
+        );
+        if (!formsRes.ok) {
+          const t = await formsRes.text();
+          throw new Error(`TikTok API error ${formsRes.status}: ${t.slice(0, 200)}`);
+        }
+        const formsData = await formsRes.json();
+        if (formsData.code !== 0) {
+          throw new Error(`TikTok error: ${formsData.message || 'unknown'}`);
+        }
+        for (const lead of formsData.data?.leads || formsData.data?.list || []) {
+          const email = lead.email || lead.email_address || lead.lead_email;
+          if (email) {
+            leads.push({
+              email,
+              name: [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.name || '',
+              company: lead.company || '',
+              phone: lead.phone || lead.phone_number || '',
+              source: 'tiktok',
+              tags: ['tiktok', lead.campaign_name || 'tiktok-lead'],
+            });
+          }
+        }
+        break;
+      }
+
       case 'custom': {
         // Generic webhook/API import - fetch from custom endpoint
         const endpoint = (integration.config as any)?.endpoint;
