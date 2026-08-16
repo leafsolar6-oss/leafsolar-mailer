@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import AppShell from '@/components/AppShell';
+import BackButtonHandler from '@/components/BackButtonHandler';
 import PWARegister from '@/components/PWARegister';
 import InstallPrompt from '@/components/InstallPrompt';
 import SchedulerPoller from '@/components/SchedulerPoller';
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <PWARegister />
         <SchedulerPoller />
+        <BackButtonHandler />
         <AppShell>{children}</AppShell>
         <Toaster position="top-center" toastOptions={{
           duration: 3200,
