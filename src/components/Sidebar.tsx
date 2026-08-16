@@ -58,21 +58,22 @@ export default function Sidebar() {
   return (
     <>
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 safe-top bg-white border-b border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between px-4 h-16">
-          <Link href="/" className="flex items-center gap-2.5">
-            <Logo />
-            <div>
-              <p className="font-bold text-[15px] leading-tight">Leaf Solar</p>
-              <p className="text-[11px] text-emerald-700 font-medium">Mailer Pro</p>
-            </div>
-          </Link>
+        <div className="flex items-center justify-between px-3 h-16">
           <div className="flex items-center gap-2">
-            <StatusPill online={online} pending={pending} />
+            {/* Hamburger on the LEFT for easy thumb access */}
             <button onClick={() => setOpen(!open)} aria-label={open ? 'Close menu' : 'Open menu'}
               className="p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 shadow-sm transition-colors">
               {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
+            <Link href="/" className="flex items-center gap-2">
+              <Logo />
+              <div>
+                <p className="font-bold text-[15px] leading-tight">Leaf Solar</p>
+                <p className="text-[11px] text-emerald-700 font-medium">Mailer Pro</p>
+              </div>
+            </Link>
           </div>
+          <StatusPill online={online} pending={pending} />
         </div>
       </div>
 

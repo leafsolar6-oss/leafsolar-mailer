@@ -35,7 +35,9 @@ export async function sendEmail(options: {
   fromName?: string;
   fromEmail?: string;
   replyTo?: string;
-}): Promise<{ success: boolean; error?: string }> {
+  inReplyTo?: string;
+  references?: string;
+}): Promise<{ success: boolean; error?: string; messageId?: string }> {
   try {
     const settings = getSMTPSettings();
     if (!settings) throw new Error('SMTP not configured');
@@ -44,14 +46,17 @@ export async function sendEmail(options: {
     const fromName = options.fromName || settings.from_name || 'Leaf Solar';
     const fromEmail = options.fromEmail || settings.from_email || settings.user;
 
-    await t.sendMail({
+    const info = await t.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
       replyTo: options.replyTo || fromEmail,
+      // Email threading headers so replies group with the original message.
+      ...(options.inReplyTo ? { inReplyTo: options.inReplyTo } : {}),
+      ...(options.references ? { references: options.references } : {}),
     });
-    return { success: true };
+    return { success: true, messageId: info.messageId };
   } catch (err: any) {
     return { success: false, error: err.message || String(err) };
   }

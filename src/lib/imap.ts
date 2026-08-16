@@ -11,6 +11,7 @@ export interface ImapSettings {
 
 export interface EmailMessage {
   id: string;
+  message_id: string;
   from: string;
   from_name: string;
   to: string;
@@ -89,7 +90,7 @@ export async function listMessages(folder = 'INBOX', limit = 30): Promise<EmailM
     for await (const msg of client.fetch(range, {
       envelope: true,
       flags: true,
-      source: { start: 0, maxLength: 50000 },
+      source: { start: 0, maxLength: 500000 },
     }, { binary: false })) {
       let subject = msg.envelope?.subject || '(no subject)';
       // Decode encoded-word subjects
@@ -113,6 +114,7 @@ export async function listMessages(folder = 'INBOX', limit = 30): Promise<EmailM
 
       messages.push({
         id: String(msg.uid || msg.seq || Math.random()),
+        message_id: (msg.envelope?.messageId as string) || '',
         from: fromEmail,
         from_name: fromName,
         to: (msg.envelope?.to || []).map((t: any) => t.address).filter(Boolean).join(', '),
@@ -129,9 +131,114 @@ export async function listMessages(folder = 'INBOX', limit = 30): Promise<EmailM
   });
 }
 
-export async function getMessage(folder: string, uid: string): Promise<EmailMessage | null> {
-  const messages = await listMessages(folder, 200);
-  return messages.find(m => m.id === uid) || null;
+/** Fetches ONE message's FULL source (no size cap) — used when opening a
+ *  message so the whole content is shown. */
+export async function getFullMessage(folder: string, uid: string): Promise<EmailMessage | null> {
+  return withClient(async (client) => {
+    await client.mailboxOpen(folder);
+    const num = parseInt(uid, 10);
+    if (isNaN(num)) return null;
+
+    let found: EmailMessage | null = null;
+    for await (const msg of client.fetch(String(num), {
+      envelope: true,
+      flags: true,
+      source: true,
+    }, { uid: true })) {
+      let subject = decodeEncoded(msg.envelope?.subject || '(no subject)');
+      const fromAddr = msg.envelope?.from?.[0];
+      let body_text = '', body_html = '', preview = '';
+      try {
+        const parsed = await simpleParser(msg.source as any);
+        body_text = parsed.text || '';
+        body_html = parsed.html || '';
+        preview = (body_text || body_html.replace(/<[^>]+>/g, ' ') || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+      } catch { preview = '(could not parse)'; }
+
+      found = {
+        id: String(msg.uid || num),
+        message_id: (msg.envelope?.messageId as string) || '',
+        from: fromAddr?.address || '',
+        from_name: decodeEncoded(fromAddr?.name || ''),
+        to: (msg.envelope?.to || []).map((t: any) => t.address).filter(Boolean).join(', '),
+        subject,
+        date: new Date((msg.envelope?.date as unknown as string) || Date.now()).toISOString(),
+        preview,
+        seen: (msg.flags || new Set()).has('\\Seen'),
+        body_html,
+        body_text,
+      };
+    }
+    return found;
+  });
+}
+
+/** Marks a message as read (\Seen). */
+export async function markSeen(folder: string, uid: string): Promise<boolean> {
+  return withClient(async (client) => {
+    await client.mailboxOpen(folder);
+    const num = parseInt(uid, 10);
+    if (isNaN(num)) return false;
+    try {
+      await client.messageFlagsAdd(String(num), ['\\Seen'], { uid: true });
+      return true;
+    } catch { return false; }
+  });
+}
+
+/** Finds a Sent-like folder in the account's folder list. */
+export async function findSentFolder(): Promise<string> {
+  const folders = await listFolders();
+  const prefs = ['Sent', 'Sent Items', 'INBOX.Sent', '[Gmail]/Sent Mail', 'Sent Messages', '&XfJT0ZAB-'];
+  for (const p of prefs) {
+    const exact = folders.find(f => f.toLowerCase() === p.toLowerCase());
+    if (exact) return exact;
+  }
+  const fuzzy = folders.find(f => /sent/i.test(f) && !/spam|junk/i.test(f));
+  return fuzzy || 'Sent';
+}
+
+/** Appends a copy of a sent message to the Sent folder so it shows under the
+ *  Sent tab. Returns the folder used, or null if append failed. */
+export async function appendToSentFolder(raw: string, flags: string[] = ['\\Seen']): Promise<string | null> {
+  return withClient(async (client) => {
+    const folder = await findSentFolder();
+    try {
+      await client.append(folder, raw, flags);
+      return folder;
+    } catch {
+      return null;
+    }
+  });
+}
+
+/** Builds a minimal raw MIME message (used for the Sent-folder copy). */
+export function buildRawMessage(opts: {
+  messageId: string;
+  from: string;
+  fromName: string;
+  to: string;
+  subject: string;
+  html: string;
+  inReplyTo?: string;
+  references?: string;
+}): string {
+  const b64 = Buffer.from(opts.html, 'utf-8').toString('base64');
+  const lines = [
+    `From: "${opts.fromName}" <${opts.from}>`,
+    `To: ${opts.to}`,
+    `Subject: ${opts.subject}`,
+    `Message-ID: ${opts.messageId}`,
+    `Date: ${new Date().toUTCString()}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=utf-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    b64,
+  ];
+  if (opts.inReplyTo) lines.splice(4, 0, `In-Reply-To: ${opts.inReplyTo}`);
+  if (opts.references) lines.splice(4, 0, `References: ${opts.references}`);
+  return lines.join('\r\n');
 }
 
 /** Decode RFC 2047 encoded words like =?UTF-8?B?...?= */

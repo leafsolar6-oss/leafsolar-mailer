@@ -25,10 +25,10 @@ export default function Dashboard() {
   );
 
   const statCards = [
-    { icon: Mail, label: 'Campaigns', value: stats?.totalCampaigns ?? 0, tint: 'from-emerald-500 to-teal-600', bg: 'bg-emerald-50', fg: 'text-emerald-600' },
-    { icon: Send, label: 'Emails Sent', value: stats?.totalSent ?? 0, tint: 'from-blue-500 to-indigo-600', bg: 'bg-blue-50', fg: 'text-blue-600' },
-    { icon: Users, label: 'Contacts', value: stats?.totalContacts ?? 0, tint: 'from-violet-500 to-purple-600', bg: 'bg-violet-50', fg: 'text-violet-600' },
-    { icon: ListChecks, label: 'Email Lists', value: stats?.totalLists ?? 0, tint: 'from-amber-500 to-orange-600', bg: 'bg-amber-50', fg: 'text-amber-600' },
+    { icon: Mail, label: 'Campaigns', value: stats?.totalCampaigns ?? 0, href: '/campaigns', tint: 'from-emerald-500 to-teal-600', bg: 'bg-emerald-50', fg: 'text-emerald-600' },
+    { icon: Send, label: 'Emails Sent', value: stats?.totalSent ?? 0, href: '/campaigns', tint: 'from-blue-500 to-indigo-600', bg: 'bg-blue-50', fg: 'text-blue-600' },
+    { icon: Users, label: 'Contacts', value: stats?.totalContacts ?? 0, href: '/contacts', tint: 'from-violet-500 to-purple-600', bg: 'bg-violet-50', fg: 'text-violet-600' },
+    { icon: ListChecks, label: 'Email Lists', value: stats?.totalLists ?? 0, href: '/lists', tint: 'from-amber-500 to-orange-600', bg: 'bg-amber-50', fg: 'text-amber-600' },
   ];
 
   return (
@@ -53,14 +53,17 @@ export default function Dashboard() {
         {statCards.map((s, i) => {
           const Icon = s.icon;
           return (
-            <div key={i} className="card p-5 relative overflow-hidden">
+            <Link key={i} href={s.href} className="card p-5 relative overflow-hidden group hover:shadow-lg transition-all">
               <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-10 bg-gradient-to-br ${s.tint}`} />
               <div className={`w-11 h-11 rounded-xl ${s.bg} flex items-center justify-center mb-3`}>
                 <Icon className={`w-5 h-5 ${s.fg}`} />
               </div>
-              <p className="text-3xl font-extrabold text-gray-900">{s.value}</p>
-              <p className="text-sm text-gray-500">{s.label}</p>
-            </div>
+              <p className="text-3xl font-extrabold text-gray-900 group-hover:text-emerald-600 transition-colors">{s.value}</p>
+              <p className="text-sm text-gray-500 flex items-center gap-1">
+                {s.label}
+                <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </p>
+            </Link>
           );
         })}
       </div>
