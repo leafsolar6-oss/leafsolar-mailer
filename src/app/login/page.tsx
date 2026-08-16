@@ -13,8 +13,14 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [showSetup, setShowSetup] = useState(false);
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
   useEffect(() => {
+    fetch('/api/health').then(r => r.json()).then(h => {
+      if (h && h.storage && !h.storage.durable) {
+        setStorageWarning('Durable storage is not connected — accounts & data can reset on server restarts. Configure Upstash Redis (or Supabase) in Vercel, then redeploy.');
+      }
+    }).catch(() => {});
     fetch('/api/auth/setup').then(r => r.json()).then(d => {
       if (!d.configured) {
         setShowSetup(true);
@@ -49,6 +55,11 @@ function LoginContent() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="card p-8 shadow-2xl animate-fade-in">
+          {storageWarning && (
+            <div className="mb-6 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800 leading-relaxed animate-fade-in">
+              ⚠️ <strong>{storageWarning}</strong>
+            </div>
+          )}
           <div className="flex items-center gap-3 mb-8">
             <Logo size={48} />
             <div>

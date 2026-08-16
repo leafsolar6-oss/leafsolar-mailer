@@ -12,8 +12,14 @@ export default function WelcomePage() {
   const [smtpOpen, setSmtpOpen] = useState(false);
   const [smtp, setSmtp] = useState({ host: 'mail.leafsolar.ng', port: '587', secure: false, user: '', pass: '', from_name: 'Leaf Solar', from_email: '' });
   const [loading, setLoading] = useState(false);
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
   useEffect(() => {
+    fetch('/api/health').then(r => r.json()).then(h => {
+      if (h && h.storage && !h.storage.durable) {
+        setStorageWarning('Durable storage is not connected — accounts & data can reset on server restarts. Configure Upstash Redis (or Supabase) in Vercel, then redeploy.');
+      }
+    }).catch(() => {});
     fetch('/api/auth/setup').then(r => r.json()).then(d => {
       if (d.configured) router.replace('/login');
     }).catch(() => {});
@@ -83,6 +89,11 @@ export default function WelcomePage() {
 
         {/* Right: setup form */}
         <div className="card p-8 animate-fade-in shadow-2xl">
+          {storageWarning && (
+            <div className="mb-6 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800 leading-relaxed animate-fade-in">
+              ⚠️ <strong>{storageWarning}</strong>
+            </div>
+          )}
           <div className="lg:hidden flex items-center gap-3 mb-6">
             <Logo size={44} />
             <div>
