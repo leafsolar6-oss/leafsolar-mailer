@@ -1,305 +1,288 @@
-import db from './db';
 import { v4 as uuidv4 } from 'uuid';
+import store from './store';
 import type {
   Contact, EmailList, Campaign, Template,
-  Integration, EmailLog, SMTPSettings, ImportResult, CampaignStats
+  Integration, EmailLog, SMTPSettings, ImportResult, CampaignStats,
 } from '@/types';
+
+const now = () => new Date().toISOString();
 
 // ==================== CONTACTS ====================
 
 export function getContacts(search?: string, listId?: string): Contact[] {
-  let query = 'SELECT * FROM contacts';
-  const params: string[] = [];
-  const conditions: string[] = [];
-
-  if (search) {
-    conditions.push('(email LIKE ? OR name LIKE ? OR company LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-  }
+  let rows = store.contacts.all();
 
   if (listId) {
-    query += ' INNER JOIN list_contacts lc ON contacts.id = lc.contact_id WHERE lc.list_id = ?';
-    params.unshift(listId);
-    if (conditions.length) {
-      query += ' AND ' + conditions.join(' AND ');
-    }
-  } else if (conditions.length) {
-    query += ' WHERE ' + conditions.join(' AND ');
+    const ids = new Set(store.lists.contactIds(listId));
+    rows = rows.filter(c => ids.has(c.id));
   }
 
-  query += ' ORDER BY created_at DESC';
-  const rows = db.prepare(query).all(...params) as any[];
-  return rows.map(r => ({ ...r, tags: JSON.parse(r.tags || '[]') }));
+  if (search) {
+    const q = search.toLowerCase();
+    rows = rows.filter(c =>
+      (c.email || '').toLowerCase().includes(q) ||
+      (c.name || '').toLowerCase().includes(q) ||
+      (c.company || '').toLowerCase().includes(q)
+    );
+  }
+
+  return rows;
 }
 
 export function getContactById(id: string): Contact | null {
-  const row = db.prepare('SELECT * FROM contacts WHERE id = ?').get(id) as any;
-  if (!row) return null;
-  return { ...row, tags: JSON.parse(row.tags || '[]') };
+  return store.contacts.byId(id) || null;
 }
 
 export function addContact(data: Partial<Contact>): Contact {
-  const id = uuidv4();
-  db.prepare(`
-    INSERT INTO contacts (id, email, name, company, phone, source, tags, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    data.email || '',
-    data.name || '',
-    data.company || '',
-    data.phone || '',
-    data.source || 'manual',
-    JSON.stringify(data.tags || []),
-    data.status || 'active'
-  );
-  return getContactById(id)!;
+  const contact: Contact = {
+    id: uuidv4(),
+    email: (data.email || '').toLowerCase().trim(),
+    name: data.name || '',
+    company: data.company || '',
+    phone: data.phone || '',
+    source: data.source || 'manual',
+    tags: data.tags || [],
+    status: data.status || 'active',
+    created_at: now(),
+    updated_at: now(),
+  };
+  store.contacts.add(contact);
+  return contact;
 }
 
 export function bulkAddContacts(contacts: Partial<Contact>[]): ImportResult {
   const result: ImportResult = { success: 0, failed: 0, errors: [], duplicates: 0 };
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO contacts (id, email, name, company, phone, source, tags, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
 
-  const insertMany = db.transaction((items: Partial<Contact>[]) => {
-    for (const c of items) {
-      if (!c.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) {
-        result.failed++;
-        result.errors.push(`Invalid email: ${c.email || '(empty)'}`);
-        continue;
-      }
-      const id = uuidv4();
-      const info = insert.run(
-        id, c.email.toLowerCase().trim(), c.name || '', c.company || '',
-        c.phone || '', c.source || 'import', JSON.stringify(c.tags || []), 'active'
-      );
-      if (info.changes > 0) result.success++;
-      else result.duplicates++;
+  for (const c of contacts) {
+    const email = (c.email || '').trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      result.failed++;
+      result.errors.push(`Invalid email: ${email || '(empty)'}`);
+      continue;
     }
-  });
+    if (store.contacts.byEmail(email)) {
+      result.duplicates++;
+      continue;
+    }
+    const contact: Contact = {
+      id: uuidv4(),
+      email: email.toLowerCase(),
+      name: c.name || '',
+      company: c.company || '',
+      phone: c.phone || '',
+      source: c.source || 'import',
+      tags: c.tags || [],
+      status: 'active',
+      created_at: now(),
+      updated_at: now(),
+    };
+    store.contacts.add(contact);
+    result.success++;
+  }
 
-  insertMany(contacts);
   return result;
 }
 
 export function deleteContact(id: string): void {
-  db.prepare('DELETE FROM contacts WHERE id = ?').run(id);
+  store.contacts.remove(id);
 }
 
 export function getContactCount(): number {
-  const row = db.prepare('SELECT COUNT(*) as count FROM contacts').get() as any;
-  return row.count;
+  return store.contacts.all().length;
 }
 
 // ==================== LISTS ====================
 
 export function getLists(): EmailList[] {
-  return db.prepare('SELECT * FROM email_lists ORDER BY created_at DESC').all() as EmailList[];
+  return store.lists.all();
 }
 
 export function getListById(id: string): EmailList | null {
-  return db.prepare('SELECT * FROM email_lists WHERE id = ?').get(id) as EmailList | null;
+  return store.lists.byId(id) || null;
 }
 
 export function createList(name: string, description: string): EmailList {
-  const id = uuidv4();
-  db.prepare('INSERT INTO email_lists (id, name, description) VALUES (?, ?, ?)').run(id, name, description);
-  return getListById(id)!;
+  const list: EmailList = {
+    id: uuidv4(),
+    name,
+    description,
+    contact_count: 0,
+    created_at: now(),
+  };
+  store.lists.add(list);
+  return list;
 }
 
 export function addContactsToList(listId: string, contactIds: string[]): number {
-  const insert = db.prepare('INSERT OR IGNORE INTO list_contacts (list_id, contact_id) VALUES (?, ?)');
-  let count = 0;
-  const tx = db.transaction((ids: string[]) => {
-    for (const cid of ids) {
-      const info = insert.run(listId, cid);
-      count += info.changes;
-    }
-  });
-  tx(contactIds);
-  // Update count
-  const row = db.prepare('SELECT COUNT(*) as c FROM list_contacts WHERE list_id = ?').get(listId) as any;
-  db.prepare('UPDATE email_lists SET contact_count = ? WHERE id = ?').run(row.c, listId);
-  return count;
+  return store.lists.addContacts(listId, contactIds);
 }
 
 export function deleteList(id: string): void {
-  db.prepare('DELETE FROM email_lists WHERE id = ?').run(id);
+  store.lists.remove(id);
 }
 
 export function getListContactIds(listId: string): string[] {
-  const rows = db.prepare('SELECT contact_id FROM list_contacts WHERE list_id = ?').all(listId) as any[];
-  return rows.map(r => r.contact_id);
+  return store.lists.contactIds(listId);
 }
 
 // ==================== CAMPAIGNS ====================
 
 export function getCampaigns(): Campaign[] {
-  const rows = db.prepare('SELECT * FROM campaigns ORDER BY created_at DESC').all() as any[];
-  return rows.map(r => ({ ...r, list_ids: JSON.parse(r.list_ids || '[]') }));
+  return store.campaigns.all();
 }
 
 export function getCampaignById(id: string): Campaign | null {
-  const row = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(id) as any;
-  if (!row) return null;
-  return { ...row, list_ids: JSON.parse(row.list_ids || '[]') };
+  return store.campaigns.byId(id) || null;
 }
 
 export function createCampaign(data: Partial<Campaign>): Campaign {
-  const id = uuidv4();
-  db.prepare(`
-    INSERT INTO campaigns (id, name, subject, body, sender_name, sender_email, reply_to, list_ids, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, data.name || 'Untitled Campaign', data.subject || '', data.body || '',
-    data.sender_name || '', data.sender_email || '', data.reply_to || '',
-    JSON.stringify(data.list_ids || []), data.status || 'draft'
-  );
-  return getCampaignById(id)!;
+  const campaign: Campaign = {
+    id: uuidv4(),
+    name: data.name || 'Untitled Campaign',
+    subject: data.subject || '',
+    body: data.body || '',
+    sender_name: data.sender_name || '',
+    sender_email: data.sender_email || '',
+    reply_to: data.reply_to || '',
+    recipient_count: 0,
+    sent_count: 0,
+    failed_count: 0,
+    status: data.status || 'draft',
+    list_ids: data.list_ids || [],
+    scheduled_at: null,
+    sent_at: null,
+    created_at: now(),
+    updated_at: now(),
+  };
+  store.campaigns.add(campaign);
+  return campaign;
 }
 
 export function updateCampaign(id: string, data: Partial<Campaign>): void {
-  const fields: string[] = [];
-  const values: any[] = [];
-  for (const [key, value] of Object.entries(data)) {
-    if (key === 'list_ids') {
-      fields.push(`${key} = ?`);
-      values.push(JSON.stringify(value));
-    } else {
-      fields.push(`${key} = ?`);
-      values.push(value);
-    }
-  }
-  fields.push("updated_at = datetime('now')");
-  values.push(id);
-  db.prepare(`UPDATE campaigns SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  store.campaigns.update(id, data);
 }
 
 export function deleteCampaign(id: string): void {
-  db.prepare('DELETE FROM campaigns WHERE id = ?').run(id);
+  store.campaigns.remove(id);
 }
 
 // ==================== TEMPLATES ====================
 
 export function getTemplates(): Template[] {
-  return db.prepare('SELECT * FROM templates ORDER BY is_default DESC, created_at DESC').all() as Template[];
+  return store.templates.all();
 }
 
 export function getTemplateById(id: string): Template | null {
-  return db.prepare('SELECT * FROM templates WHERE id = ?').get(id) as Template | null;
+  return store.templates.byId(id) || null;
 }
 
 export function createTemplate(data: Partial<Template>): Template {
-  const id = uuidv4();
-  db.prepare(`
-    INSERT INTO templates (id, name, subject, body, category)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, data.name || '', data.subject || '', data.body || '', data.category || 'general');
-  return getTemplateById(id)!;
+  const t: Template = {
+    id: uuidv4(),
+    name: data.name || '',
+    subject: data.subject || '',
+    body: data.body || '',
+    category: data.category || 'general',
+    is_default: false,
+    created_at: now(),
+  };
+  store.templates.add(t);
+  return t;
 }
 
 export function deleteTemplate(id: string): void {
-  db.prepare('DELETE FROM templates WHERE id = ?').run(id);
+  store.templates.remove(id);
 }
 
 // ==================== INTEGRATIONS ====================
 
 export function getIntegrations(): Integration[] {
-  const rows = db.prepare('SELECT * FROM integrations ORDER BY connected DESC, display_name').all() as any[];
-  return rows.map(r => ({ ...r, connected: !!r.connected, config: JSON.parse(r.config || '{}') }));
+  return store.integrations.all();
 }
 
 export function getIntegrationByPlatform(platform: string): Integration | null {
-  const row = db.prepare('SELECT * FROM integrations WHERE platform = ?').get(platform) as any;
-  if (!row) return null;
-  return { ...row, connected: !!row.connected, config: JSON.parse(row.config || '{}') };
+  return store.integrations.byPlatform(platform) || null;
 }
 
 export function upsertIntegration(data: Partial<Integration>): Integration {
   const existing = getIntegrationByPlatform(data.platform || '');
-  if (existing) {
-    db.prepare(`
-      UPDATE integrations SET
-        api_key = ?, api_secret = ?, access_token = ?, refresh_token = ?,
-        server_prefix = ?, connected = ?, config = ?, last_sync = datetime('now')
-      WHERE platform = ?
-    `).run(
-      data.api_key || '', data.api_secret || '', data.access_token || '',
-      data.refresh_token || '', data.server_prefix || '',
-      data.connected ? 1 : 0, JSON.stringify(data.config || {}), data.platform
-    );
-    return getIntegrationByPlatform(data.platform!)!;
-  }
-  const id = uuidv4();
-  db.prepare(`
-    INSERT INTO integrations (id, platform, display_name, api_key, api_secret, access_token, refresh_token, server_prefix, connected, config)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, data.platform || '', data.display_name || '', data.api_key || '',
-    data.api_secret || '', data.access_token || '', data.refresh_token || '',
-    data.server_prefix || '', data.connected ? 1 : 0, JSON.stringify(data.config || {})
-  );
-  return getIntegrationByPlatform(data.platform!)!;
+  const integration: Integration = existing
+    ? { ...existing, ...data } as Integration
+    : {
+        id: uuidv4(),
+        platform: data.platform || '',
+        display_name: data.display_name || data.platform || '',
+        api_key: data.api_key || '',
+        api_secret: data.api_secret || '',
+        access_token: data.access_token || '',
+        refresh_token: data.refresh_token || '',
+        server_prefix: data.server_prefix || '',
+        connected: data.connected ?? false,
+        config: data.config || {},
+        last_sync: null,
+        created_at: now(),
+      };
+  store.integrations.upsert(integration);
+  return integration;
 }
 
 // ==================== SETTINGS ====================
 
 export function getSetting(key: string): string | null {
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as any;
-  return row ? row.value : null;
+  return store.settings.get(key) || null;
 }
 
 export function setSetting(key: string, value: string): void {
-  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value);
+  store.settings.set(key, value);
 }
 
 export function getSMTPSettings(): SMTPSettings | null {
-  const raw = getSetting('smtp');
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
+  return store.settings.getSMTP();
 }
 
-export function setSMTPSettings(settings: SMTPSettings): void {
-  setSetting('smtp', JSON.stringify(settings));
+export function setSMTPSettings(s: SMTPSettings): void {
+  store.settings.setSMTP(s);
 }
 
 // ==================== EMAIL LOGS ====================
 
 export function getEmailLogs(campaignId?: string, limit = 100): EmailLog[] {
-  if (campaignId) {
-    return db.prepare('SELECT * FROM email_logs WHERE campaign_id = ? ORDER BY created_at DESC LIMIT ?').all(campaignId, limit) as EmailLog[];
-  }
-  return db.prepare('SELECT * FROM email_logs ORDER BY created_at DESC LIMIT ?').all(limit) as EmailLog[];
+  return store.logs.all(campaignId, limit);
 }
 
 export function addEmailLog(log: Partial<EmailLog>): EmailLog {
-  const id = uuidv4();
-  db.prepare(`
-    INSERT INTO email_logs (id, campaign_id, contact_email, contact_name, subject, status, error)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, log.campaign_id || null, log.contact_email, log.contact_name || '', log.subject || '', log.status || 'pending', log.error || '');
-  return db.prepare('SELECT * FROM email_logs WHERE id = ?').get(id) as EmailLog;
+  const entry: EmailLog = {
+    id: uuidv4(),
+    campaign_id: log.campaign_id || null,
+    contact_email: log.contact_email || '',
+    contact_name: log.contact_name || '',
+    subject: log.subject || '',
+    status: log.status || 'pending',
+    error: log.error || '',
+    sent_at: log.sent_at || null,
+    created_at: now(),
+  };
+  store.logs.add(entry);
+  return entry;
 }
 
 // ==================== STATS ====================
 
 export function getStats(): CampaignStats {
-  const totalCampaigns = (db.prepare('SELECT COUNT(*) as c FROM campaigns').get() as any).c;
-  const totalSent = (db.prepare('SELECT COALESCE(SUM(sent_count), 0) as c FROM campaigns').get() as any).c;
-  const totalContacts = getContactCount();
-  const totalLists = (db.prepare('SELECT COUNT(*) as c FROM email_lists').get() as any).c;
-  const recentCampaigns = getCampaigns().slice(0, 5);
-
-  return { totalCampaigns, totalSent, totalContacts, totalLists, recentCampaigns };
+  const campaigns = getCampaigns();
+  return {
+    totalCampaigns: campaigns.length,
+    totalSent: campaigns.reduce((s, c) => s + (c.sent_count || 0), 0),
+    totalContacts: getContactCount(),
+    totalLists: getLists().length,
+    recentCampaigns: campaigns.slice(0, 5),
+  };
 }
 
 // ==================== SEED DEFAULT TEMPLATES ====================
 
 export function seedDefaultTemplates(): void {
-  const count = (db.prepare('SELECT COUNT(*) as c FROM templates').get() as any).c;
-  if (count > 0) return;
+  if (store.templates.all().length > 0) return;
 
   const templates = [
     {
@@ -325,7 +308,7 @@ export function seedDefaultTemplates(): void {
     </div>
     <p>Best regards,<br><strong>Leaf Solar Team</strong><br>www.leafsolar.ng</p>
   </div>
-</div>`
+</div>`,
     },
     {
       name: 'Product Announcement',
@@ -341,7 +324,7 @@ export function seedDefaultTemplates(): void {
     <p><a href="https://www.leafsolar.ng" style="color: #16a34a;">Visit our website</a> to explore the full range.</p>
     <p>Warm regards,<br>Leaf Solar Team</p>
   </div>
-</div>`
+</div>`,
     },
     {
       name: 'Newsletter',
@@ -357,7 +340,7 @@ export function seedDefaultTemplates(): void {
     <p>Read more on our <a href="https://www.leafsolar.ng/blog">blog</a>.</p>
     <p>— The Leaf Solar Team</p>
   </div>
-</div>`
+</div>`,
     },
     {
       name: 'Follow Up',
@@ -370,7 +353,7 @@ export function seedDefaultTemplates(): void {
     <p>Feel free to reply or <a href="https://www.leafsolar.ng/contact">contact us</a> anytime.</p>
     <p>Best,<br>Leaf Solar Team</p>
   </div>
-</div>`
+</div>`,
     },
     {
       name: 'Seasonal Promotion',
@@ -390,18 +373,22 @@ export function seedDefaultTemplates(): void {
     <p>Hurry, offer ends soon!</p>
     <p>Leaf Solar Team</p>
   </div>
-</div>`
-    }
+</div>`,
+    },
   ];
 
-  const insert = db.prepare(`
-    INSERT INTO templates (id, name, subject, body, category, is_default)
-    VALUES (?, ?, ?, ?, ?, 1)
-  `);
   for (const t of templates) {
-    insert.run(uuidv4(), t.name, t.subject, t.body, t.category);
+    const tmpl: Template = {
+      id: uuidv4(),
+      name: t.name,
+      subject: t.subject,
+      body: t.body,
+      category: t.category,
+      is_default: true,
+      created_at: now(),
+    };
+    store.templates.add(tmpl);
   }
 }
 
-// Seed on init
 seedDefaultTemplates();
