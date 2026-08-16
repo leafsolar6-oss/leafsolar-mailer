@@ -13,7 +13,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const SESSION_COOKIE = 'ls_session';
 
-const PUBLIC_PAGES = ['/login', '/welcome', '/unsubscribe', '/forgot-password', '/reset-password'];
+const PUBLIC_PAGES = ['/login', '/unsubscribe', '/forgot-password', '/reset-password'];
 // /api/scheduler is intentionally public at the proxy layer: the route itself
 // enforces auth via the CRON_SECRET bearer token / x-vercel-cron header, so
 // the GitHub Actions scheduler (no session cookie) can reach it.

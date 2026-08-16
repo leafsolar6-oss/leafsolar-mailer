@@ -1,7 +1,7 @@
 'use client';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Lock, Mail, LogIn } from 'lucide-react';
+import { Lock, Mail, LogIn, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -12,7 +12,7 @@ function LoginContent() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [showSetup, setShowSetup] = useState(false);
+  const [notSetup, setNotSetup] = useState(false);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,22 +21,19 @@ function LoginContent() {
         setStorageWarning('Durable storage is not connected — accounts & data can reset on server restarts. Configure Upstash Redis (or Supabase) in Vercel, then redeploy.');
       }
     }).catch(() => {});
-    fetch('/api/auth/setup').then(r => r.json()).then(d => {
-      if (!d.configured) {
-        setShowSetup(true);
-        router.replace('/welcome');
+    // If already logged in, skip straight in.
+    fetch('/api/auth/status').then(r => r.json()).then(s => {
+      if (s.authenticated) {
+        router.replace(searchParams.get('next') || '/');
         return;
       }
-      // Already logged in? Skip login.
-      fetch('/api/auth/status').then(r => r.json()).then(s => {
-        if (s.authenticated) router.replace(searchParams.get('next') || '/');
-      }).catch(() => {}).finally(() => setChecking(false));
-    }).catch(() => setChecking(false));
+      setNotSetup(!s.configured);
+    }).catch(() => {}).finally(() => setChecking(false));
   }, [router, searchParams]);
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!email || !password) return toast.error('Enter your email and password');
+    if (!email || !password) return toast.error('Enter your admin email and password');
     setLoading(true);
     const res = await fetch('/api/auth/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -64,30 +61,39 @@ function LoginContent() {
             <Logo size={48} />
             <div>
               <p className="text-xl font-extrabold text-gray-900">Leaf Solar Mailer</p>
-              <p className="text-xs text-emerald-700 font-semibold">Sign in to continue</p>
+              <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" /> Admin sign in
+              </p>
             </div>
           </div>
 
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
-                <Mail className="w-4 h-4 text-gray-400" /> Email
-              </label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@leafsolar.ng" className="input" autoComplete="username" />
+          {notSetup ? (
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 animate-fade-in">
+              The admin account hasn&apos;t been set up on this deployment yet. Please contact your
+              administrator. <Link href="/forgot-password" className="underline font-semibold">Forgot password?</Link>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
-                <Lock className="w-4 h-4 text-gray-400" /> Password
-              </label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="Your password" className="input" autoComplete="current-password" />
-            </div>
-            <button type="submit" disabled={loading}
-              className="btn btn-primary w-full !py-3 disabled:opacity-60">
-              {loading ? <div className="spinner !w-5 !h-5" /> : <><LogIn className="w-5 h-5" /> Sign in</>}
-            </button>
-          </form>
+          ) : (
+            <form onSubmit={submit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                  <Mail className="w-4 h-4 text-gray-400" /> Admin email
+                </label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="you@leafsolar.ng" className="input" autoComplete="username" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                  <Lock className="w-4 h-4 text-gray-400" /> Password
+                </label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="Your password" className="input" autoComplete="current-password" />
+              </div>
+              <button type="submit" disabled={loading}
+                className="btn btn-primary w-full !py-3 disabled:opacity-60">
+                {loading ? <div className="spinner !w-5 !h-5" /> : <><LogIn className="w-5 h-5" /> Sign in</>}
+              </button>
+            </form>
+          )}
 
           <p className="text-center mt-5">
             <Link href="/forgot-password" className="text-sm font-semibold text-emerald-600 hover:underline">

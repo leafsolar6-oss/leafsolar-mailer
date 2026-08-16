@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   try {
     await whenStoreReady();
     if (!isAuthConfigured()) {
-      return NextResponse.json({ error: 'No admin account yet. Set one up on the welcome page.' }, { status: 400 });
+      return NextResponse.json({ error: 'No admin account configured on this deployment.' }, { status: 400 });
     }
     const body = await req.json();
     const email = (body.email || '').trim();

@@ -8,7 +8,7 @@ import type { SMTPSettings } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-/** GET: first-run status — used by /welcome and /login. */
+/** GET: first-run status — whether an admin account is configured. */
 export async function GET() {
   await whenStoreReady();
   return NextResponse.json({ configured: isAuthConfigured(), email: getAuthEmail() });
