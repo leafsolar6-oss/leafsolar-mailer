@@ -13,8 +13,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const SESSION_COOKIE = 'ls_session';
 
-const PUBLIC_PAGES = ['/login', '/welcome', '/unsubscribe'];
-const PUBLIC_API = ['/api/auth', '/api/t', '/api/unsubscribe'];
+const PUBLIC_PAGES = ['/login', '/welcome', '/unsubscribe', '/forgot-password', '/reset-password'];
+const PUBLIC_API = ['/api/auth', '/api/t', '/api/unsubscribe', '/api/health'];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

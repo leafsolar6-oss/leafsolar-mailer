@@ -53,6 +53,36 @@ export function changePassword(currentPassword: string, newPassword: string): bo
   return true;
 }
 
+// ----- Password reset (email-based, for the single admin) -----
+
+export function createPasswordResetToken(): string {
+  const token = crypto.randomBytes(24).toString('hex');
+  store.settings.set('auth_reset_token', token);
+  store.settings.set('auth_reset_expires', String(Date.now() + 30 * 60 * 1000)); // 30 min
+  return token;
+}
+
+export function resetPasswordWithToken(
+  token: string,
+  newPassword: string
+): { ok: boolean; error?: string } {
+  const stored = store.settings.get('auth_reset_token');
+  const expires = parseInt(store.settings.get('auth_reset_expires') || '0', 10);
+  if (!stored || stored !== token) return { ok: false, error: 'Invalid or expired reset link' };
+  if (Date.now() > expires) return { ok: false, error: 'Reset link expired. Request a new one.' };
+  if (!newPassword || newPassword.length < 6) {
+    return { ok: false, error: 'Password must be at least 6 characters' };
+  }
+  const email = store.settings.get('auth_email');
+  if (!email) return { ok: false, error: 'No admin account configured' };
+  const salt = crypto.randomBytes(16).toString('hex');
+  store.settings.set('auth_salt', salt);
+  store.settings.set('auth_password_hash', hashPassword(newPassword, salt));
+  store.settings.set('auth_reset_token', '');
+  store.settings.set('auth_reset_expires', '');
+  return { ok: true };
+}
+
 export function createSessionToken(): string {
   const token = crypto.randomBytes(32).toString('hex');
   store.settings.set('session_token', token);

@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Lock, Mail, LogIn } from 'lucide-react';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 
 function LoginContent() {
@@ -77,7 +78,13 @@ function LoginContent() {
             </button>
           </form>
 
-          <p className="text-center text-xs text-gray-400 mt-6">
+          <p className="text-center mt-5">
+            <Link href="/forgot-password" className="text-sm font-semibold text-emerald-600 hover:underline">
+              Forgot your password?
+            </Link>
+          </p>
+
+          <p className="text-center text-xs text-gray-400 mt-4">
             Protected workspace · © {new Date().getFullYear()} Leaf Solar
           </p>
         </div>
