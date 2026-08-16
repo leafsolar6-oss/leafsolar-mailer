@@ -15,7 +15,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  *   npx cap sync android
  *   npx cap open android      (Build > Build APK in Android Studio)
  */
-const appUrl = process.env.APP_URL || 'https://leafsolar-mailer.vercel.app';
+const appUrl = process.env.APP_URL || 'https://mailer.leafsolar.ng';
 
 const config: CapacitorConfig = {
   appId: 'ng.leafsolar.mailer',
