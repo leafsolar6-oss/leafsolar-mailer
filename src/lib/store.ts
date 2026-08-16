@@ -114,33 +114,39 @@ async function pullSnapshot(): Promise<string | null> {
   return null;
 }
 
-/** Mirrors the snapshot to every configured durable store. */
-function pushSnapshot(value: string): void {
-  if (kvConfigured()) kvPut(value).catch(() => { /* unavailable */ });
-  if (supabaseConfigured()) supabasePut(value).catch(() => { /* unavailable */ });
+/** Mirrors the snapshot to every configured durable store (awaits each push
+ *  so the caller can keep the function alive until it completes). */
+async function pushSnapshot(value: string): Promise<void> {
+  const tasks: Promise<void>[] = [];
+  if (kvConfigured()) tasks.push(kvPut(value).catch(() => { /* unavailable */ }));
+  if (supabaseConfigured()) tasks.push(supabasePut(value).catch(() => { /* unavailable */ }));
+  await Promise.all(tasks);
 }
 
 /** Push of the whole store (skipped until hydrated so a cold-start seed never
  *  overwrites the durable snapshot). Runs AFTER the response via Next's
  *  after() — on Vercel serverless a setTimeout may never fire because the
- *  function is frozen once the response is sent. Falls back to a debounced
- *  timer outside a request context (local dev / scripts). */
+ *  function is frozen once the response is sent, and the after() callback
+ *  MUST await the network push or Vercel freezes the function mid-request.
+ *  Falls back to a debounced timer outside a request context (dev/scripts). */
 let flushScheduled = false;
 function scheduleFlush(): void {
   if (!anyPersistConfigured() || !hydrated) return;
   if (flushScheduled) return;
   flushScheduled = true;
-  const doFlush = () => {
+
+  const doFlush = async () => {
     flushScheduled = false;
     if (!cache) return;
-    pushSnapshot(JSON.stringify(cache));
+    await pushSnapshot(JSON.stringify(cache));
   };
+
   try {
-    after(doFlush);
+    after(async () => { await doFlush(); });
   } catch {
     // Outside a request context — use a debounced timer instead.
     if (flushTimer) clearTimeout(flushTimer);
-    flushTimer = setTimeout(doFlush, 800);
+    flushTimer = setTimeout(() => { void doFlush(); }, 800);
   }
 }
 
