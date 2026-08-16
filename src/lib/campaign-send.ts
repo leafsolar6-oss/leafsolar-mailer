@@ -46,6 +46,12 @@ export async function sendCampaignById(campaignId: string): Promise<SendResult> 
   // Narrow the campaign type for use inside the worker closures below.
   const c = campaign;
 
+  // Best-effort mirroring of sent campaign emails into the mailbox's Sent
+  // folder (only when IMAP is configured and the send is small enough to stay
+  // inside serverless limits).
+  const SENT_COPY_CAP = 30;
+  const sentCopies: { to: string; subject: string; html: string; messageId?: string }[] = [];
+
   // Send in parallel with a bounded concurrency (matches the nodemailer pool's
   // maxConnections) so a full campaign finishes inside serverless time limits
   // instead of one-by-one.
@@ -86,6 +92,9 @@ export async function sendCampaignById(campaignId: string): Promise<SendResult> 
 
       if (result.success) {
         sent++;
+        if (sentCopies.length < SENT_COPY_CAP) {
+          sentCopies.push({ to: contact.email, subject, html, messageId: result.messageId });
+        }
         addEmailLog({
           campaign_id: campaignId,
           contact_email: contact.email,
@@ -120,6 +129,28 @@ export async function sendCampaignById(campaignId: string): Promise<SendResult> 
     sent_at: new Date().toISOString(),
     scheduled_at: null,
   });
+
+  // Best-effort: save copies of the sent campaign emails into the mailbox's
+  // Sent folder (when IMAP is configured). Skipped for large sends to stay
+  // within serverless time limits.
+  if (sentCopies.length > 0) {
+    try {
+      const { getImapSettings, appendManyToSentFolder, buildRawMessage } = await import('./imap');
+      if (getImapSettings()) {
+        const raws = sentCopies.map(copy => buildRawMessage({
+          messageId: copy.messageId || `<${Date.now()}-${Math.random().toString(36).slice(2)}@leafsolar>`,
+          from: getImapSettings()!.user,
+          fromName: c.sender_name || 'Leaf Solar',
+          to: copy.to,
+          subject: copy.subject,
+          html: copy.html,
+        }));
+        await appendManyToSentFolder(raws);
+      }
+    } catch {
+      /* non-fatal */
+    }
+  }
 
   // Safety snapshot after a bulk send when auto-backup is enabled.
   if (isAutoBackupEnabled()) {

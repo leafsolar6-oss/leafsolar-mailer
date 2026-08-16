@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   listMessages, listFolders, getImapSettings, getFullMessage, markSeen,
-  appendToSentFolder, buildRawMessage,
+  appendToSentFolder, buildRawMessage, deleteMessages, moveMessages,
 } from '@/lib/imap';
 import { getSetting, setSetting, addEmailLog } from '@/lib/queries';
 import { requireAuth } from '@/lib/auth';
@@ -77,6 +77,18 @@ export async function POST(req: NextRequest) {
       const { testImap } = await import('@/lib/imap');
       const result = await testImap(body);
       return NextResponse.json(result);
+    }
+
+    // Delete messages.
+    if (body.action === 'delete') {
+      const removed = await deleteMessages(body.folder || 'INBOX', body.uids || []);
+      return NextResponse.json({ success: true, removed });
+    }
+
+    // Move messages to another folder.
+    if (body.action === 'move') {
+      const moved = await moveMessages(body.folder || 'INBOX', body.uids || [], body.to);
+      return NextResponse.json({ success: true, moved });
     }
 
     // Reply to an inbox message: send via SMTP + append a copy to Sent.

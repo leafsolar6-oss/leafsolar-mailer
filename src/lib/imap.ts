@@ -186,6 +186,47 @@ export async function markSeen(folder: string, uid: string): Promise<boolean> {
   });
 }
 
+/** Deletes the given messages (marks \Deleted + expunges). */
+export async function deleteMessages(folder: string, uids: string[]): Promise<number> {
+  return withClient(async (client) => {
+    await client.mailboxOpen(folder);
+    let removed = 0;
+    for (const uid of uids) {
+      const num = parseInt(uid, 10);
+      if (isNaN(num)) continue;
+      try {
+        await client.messageDelete(String(num), { uid: true });
+        removed++;
+      } catch { /* keep going */ }
+    }
+    return removed;
+  });
+}
+
+/** Moves messages to another folder (server-side MOVE). */
+export async function moveMessages(fromFolder: string, uids: string[], toFolder: string): Promise<number> {
+  return withClient(async (client) => {
+    await client.mailboxOpen(fromFolder);
+    let moved = 0;
+    for (const uid of uids) {
+      const num = parseInt(uid, 10);
+      if (isNaN(num)) continue;
+      try {
+        await client.messageMove(String(num), toFolder, { uid: true });
+        moved++;
+      } catch {
+        // Fallback: copy + delete for servers without MOVE support.
+        try {
+          await client.messageCopy(String(num), toFolder, { uid: true });
+          await client.messageDelete(String(num), { uid: true });
+          moved++;
+        } catch { /* skip */ }
+      }
+    }
+    return moved;
+  });
+}
+
 /** Finds a Sent-like folder in the account's folder list. */
 export async function findSentFolder(): Promise<string> {
   const folders = await listFolders();
@@ -209,6 +250,22 @@ export async function appendToSentFolder(raw: string, flags: string[] = ['\\Seen
     } catch {
       return null;
     }
+  });
+}
+
+/** Appends many copies to the Sent folder on a SINGLE connection (fast). */
+export async function appendManyToSentFolder(raws: string[]): Promise<number> {
+  if (!raws.length) return 0;
+  return withClient(async (client) => {
+    const folder = await findSentFolder();
+    let n = 0;
+    for (const raw of raws) {
+      try {
+        await client.append(folder, raw, ['\\Seen']);
+        n++;
+      } catch { /* skip this one */ }
+    }
+    return n;
   });
 }
 

@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Inbox, Mail, RefreshCw, Settings as SettingsIcon, ChevronLeft,
-  Inbox as InboxIcon, Send, FileText, CornerUpLeft, Loader2,
+  Inbox as InboxIcon, Send, FileText, CornerUpLeft, Loader2, Trash2,
+  FolderInput, X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -37,6 +38,10 @@ export default function InboxPage() {
   const [sendingReply, setSendingReply] = useState(false);
   const [replyForm, setReplyForm] = useState<ReplyForm>({ to: '', to_name: '', subject: '', body: '', in_reply_to: '' });
   const [imap, setImap] = useState({ host: 'mail.leafsolar.ng', port: 993, secure: true, user: '', pass: '' });
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [showMove, setShowMove] = useState(false);
+  const [moveTo, setMoveTo] = useState('');
 
   const checkStatus = () => {
     fetch('/api/inbox?action=status').then(r => r.json()).then(d => {
@@ -63,6 +68,60 @@ export default function InboxPage() {
 
   useEffect(checkStatus, []);
   useEffect(() => { if (configured) { loadFolders(); load(); } }, [configured, folder, loadFolders, load]);
+
+  const toggleSelect = (id: string) => {
+    setBulkSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setBulkSelected(prev => {
+      const all = new Set(messages.map(m => m.id));
+      return prev.size === all.size && all.size > 0 ? new Set() : all;
+    });
+  };
+
+  const bulkDelete = async () => {
+    if (!bulkSelected.size) return;
+    if (!confirm(`Delete ${bulkSelected.size} message(s)? This cannot be undone.`)) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/inbox', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', folder, uids: [...bulkSelected] }),
+      });
+      const data = await res.json();
+      if (!res.ok) return toast.error(data.error || 'Delete failed');
+      toast.success(`Deleted ${data.removed} message(s)`);
+      setBulkSelected(new Set());
+      load();
+    } catch (e: any) {
+      toast.error(e.message || 'Delete failed');
+    } finally { setBulkBusy(false); }
+  };
+
+  const bulkMove = async () => {
+    if (!bulkSelected.size || !moveTo) return toast.error('Select a destination folder');
+    if (moveTo === folder) return toast.error('Already in that folder');
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/inbox', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'move', folder, uids: [...bulkSelected], to: moveTo }),
+      });
+      const data = await res.json();
+      if (!res.ok) return toast.error(data.error || 'Move failed');
+      toast.success(`Moved ${data.moved} message(s)`);
+      setBulkSelected(new Set());
+      setShowMove(false);
+      load();
+    } catch (e: any) {
+      toast.error(e.message || 'Move failed');
+    } finally { setBulkBusy(false); }
+  };
 
   // Resolve friendly tabs to real IMAP folder names.
   const tabs = useCallback(() => {
@@ -216,29 +275,61 @@ export default function InboxPage() {
             <p className="text-gray-500">No messages in {activeTab?.name || folder}</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
-            {messages.map(m => (
-              <button key={m.id} onClick={() => openMessage(m)}
-                className={`w-full text-left p-4 hover:bg-gray-50 flex items-start gap-3 transition-colors ${!m.seen ? 'bg-emerald-50/40' : ''}`}>
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
-                  !m.seen ? 'bg-emerald-600' : 'bg-gray-300'
-                }`}>
-                  {(m.from_name || m.from || '?')[0].toUpperCase()}
+          <div className="max-h-[600px] overflow-y-auto">
+            {/* Bulk bar */}
+            {bulkSelected.size > 0 && (
+              <div className="sticky top-0 z-10 flex items-center gap-2 flex-wrap p-2.5 bg-emerald-600 text-white text-sm animate-fade-in">
+                <span className="font-bold px-2">{bulkSelected.size} selected</span>
+                <div className="flex-1" />
+                <button onClick={() => { setShowMove(true); }} disabled={bulkBusy}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 font-semibold disabled:opacity-50">
+                  <FolderInput className="w-4 h-4" /> Move
+                </button>
+                <button onClick={bulkDelete} disabled={bulkBusy}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 font-semibold disabled:opacity-50">
+                  {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Delete
+                </button>
+                <button onClick={() => setBulkSelected(new Set())} disabled={bulkBusy}
+                  className="p-1.5 rounded-lg hover:bg-white/20"><X className="w-4 h-4" /></button>
+              </div>
+            )}
+            <div className="divide-y divide-gray-50">
+              {messages.map(m => (
+                <div key={m.id}
+                  className={`group flex items-start gap-2 px-2 py-2 hover:bg-gray-50 transition-colors cursor-pointer ${!m.seen ? 'bg-emerald-50/40' : ''} ${bulkSelected.has(m.id) ? 'bg-emerald-50' : ''}`}>
+                  <button onClick={() => toggleSelect(m.id)} aria-label="Select"
+                    className={`mt-3.5 w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                      bulkSelected.has(m.id) ? 'bg-emerald-600 border-emerald-600' : 'border-gray-300 bg-white hover:border-emerald-400'
+                    }`}>
+                    {bulkSelected.has(m.id) && <span className="text-white text-xs leading-none">✓</span>}
+                  </button>
+                  <button onClick={() => openMessage(m)} className="w-full text-left flex items-start gap-3">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
+                      !m.seen ? 'bg-emerald-600' : 'bg-gray-300'
+                    }`}>
+                      {(m.from_name || m.from || '?')[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className={`truncate ${!m.seen ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
+                          {m.from_name || m.from || '(unknown sender)'}
+                        </p>
+                        <span className="text-xs text-gray-400 flex-shrink-0">{formatDate(m.date)}</span>
+                      </div>
+                      <p className={`text-sm truncate ${!m.seen ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>
+                        {m.subject}
+                      </p>
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{m.preview}</p>
+                    </div>
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className={`truncate ${!m.seen ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
-                      {m.from_name || m.from || '(unknown sender)'}
-                    </p>
-                    <span className="text-xs text-gray-400 flex-shrink-0">{formatDate(m.date)}</span>
-                  </div>
-                  <p className={`text-sm truncate ${!m.seen ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>
-                    {m.subject}
-                  </p>
-                  <p className="text-xs text-gray-400 truncate mt-0.5">{m.preview}</p>
-                </div>
+              ))}
+            </div>
+            <div className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400 bg-gray-50/50 flex items-center gap-2">
+              <button onClick={selectAllVisible} className="font-semibold text-emerald-600 hover:underline">
+                {bulkSelected.size === messages.length && messages.length > 0 ? 'Deselect all' : `Select all ${messages.length}`}
               </button>
-            ))}
+            </div>
           </div>
         )}
       </div>
@@ -318,6 +409,36 @@ export default function InboxPage() {
                 {sendingReply ? 'Sending…' : 'Send Reply'}
               </button>
               <button onClick={() => setReplying(false)} className="btn btn-secondary">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move-to-folder modal */}
+      {showMove && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowMove(false)} />
+          <div className="relative bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl animate-fade-in">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-extrabold flex items-center gap-2">
+                <FolderInput className="w-5 h-5 text-emerald-600" /> Move {bulkSelected.size} message(s)
+              </h2>
+              <button onClick={() => setShowMove(false)} className="p-2 hover:bg-gray-100 rounded-xl text-xl">×</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Destination folder</label>
+                <select value={moveTo} onChange={e => setMoveTo(e.target.value)} className="input">
+                  <option value="">— Choose folder —</option>
+                  {folders.filter(f => f !== folder).map(f => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </select>
+              </div>
+              <button onClick={bulkMove} disabled={bulkBusy || !moveTo} className="btn btn-primary w-full disabled:opacity-50">
+                {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderInput className="w-4 h-4" />}
+                Move here
+              </button>
             </div>
           </div>
         </div>
