@@ -3,6 +3,7 @@ import { bulkAddContacts, addContactsToList } from '@/lib/queries';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { requireAuth } from '@/lib/auth';
+import { flushNow } from '@/lib/store';
 
 export async function POST(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
       if (ids.length) addContactsToList(listId, ids);
     }
 
+    await flushNow();
     return NextResponse.json({ ...result, total: contacts.length });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

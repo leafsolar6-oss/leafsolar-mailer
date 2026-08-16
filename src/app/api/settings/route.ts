@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSMTPSettings, setSMTPSettings, getSetting, setSetting } from '@/lib/queries';
 import { verifySMTP } from '@/lib/email';
 import { requireAuth } from '@/lib/auth';
+import { flushNow } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,15 +32,18 @@ export async function POST(req: NextRequest) {
     }
     if (body.action === 'set' && body.key) {
       setSetting(body.key, String(body.value ?? ''));
+      await flushNow();
       return NextResponse.json({ success: true });
     }
     if (body.action === 'change_password') {
       const { changePassword } = await import('@/lib/auth');
       const ok = changePassword(body.current_password, body.new_password);
       if (!ok) return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 });
+      await flushNow();
       return NextResponse.json({ success: true });
     }
     setSMTPSettings(body);
+    await flushNow();
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

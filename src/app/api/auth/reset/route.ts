@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resetPasswordWithToken, createSessionToken, applySessionCookie, getAuthEmail } from '@/lib/auth';
-import { whenStoreReady } from '@/lib/store';
+import { whenStoreReady, flushNow } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
 
   // Log them straight in with a fresh session.
   const session = createSessionToken();
+  await flushNow();
   const res = NextResponse.json({ success: true, email: getAuthEmail() });
   return applySessionCookie(res, session);
 }

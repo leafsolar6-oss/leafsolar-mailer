@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { flushNow } from '@/lib/store';
 import { getCampaignById, updateCampaign } from '@/lib/queries';
 import { sendCampaignById } from '@/lib/campaign-send';
 
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
     if (!result.success) {
       return NextResponse.json({ error: result.errors[0] || 'Failed to send' }, { status: 400 });
     }
+    await flushNow();
     return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to send' }, { status: 500 });

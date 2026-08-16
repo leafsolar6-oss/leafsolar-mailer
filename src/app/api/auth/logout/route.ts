@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { destroySession, clearSessionCookie } from '@/lib/auth';
-import { whenStoreReady } from '@/lib/store';
+import { whenStoreReady, flushNow } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
   await whenStoreReady();
   destroySession();
+  await flushNow();
   return clearSessionCookie(NextResponse.json({ success: true }));
 }

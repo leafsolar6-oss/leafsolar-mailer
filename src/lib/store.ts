@@ -187,6 +187,18 @@ export function whenStoreReady(): Promise<void> {
   return hydrate();
 }
 
+/** Awaits a push of the current store to every configured durable store.
+ *  Critical routes call this BEFORE responding so data is guaranteed on
+ *  serverless (after() is best-effort there). */
+export async function flushNow(): Promise<void> {
+  if (!cache || !anyPersistConfigured() || !hydrated) return;
+  try {
+    await pushSnapshot(JSON.stringify(cache));
+  } catch {
+    /* non-fatal */
+  }
+}
+
 function load(): DBShape {
   if (cache) return cache;
   let next: DBShape;

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   isAuthConfigured, verifyCredentials, createSessionToken, applySessionCookie,
 } from '@/lib/auth';
-import { whenStoreReady } from '@/lib/store';
+import { whenStoreReady, flushNow } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     const token = createSessionToken();
+    await flushNow(); // persist the fresh session token
     const res = NextResponse.json({ success: true, email: email.toLowerCase().trim() });
     return applySessionCookie(res, token);
   } catch (err: any) {

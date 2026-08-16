@@ -4,6 +4,7 @@ import store from '@/lib/store';
 import { sendEmail, mergeTemplate, addTrackingToHtml, makeTrackingId } from '@/lib/email';
 import { addEmailLog, bulkAddContacts } from '@/lib/queries';
 import { requireAuth } from '@/lib/auth';
+import { flushNow } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    await flushNow();
     return NextResponse.json({ success: true, results });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

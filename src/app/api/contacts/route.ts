@@ -4,6 +4,7 @@ import {
   updateContact, setContactLists,
 } from '@/lib/queries';
 import { requireAuth } from '@/lib/auth';
+import { flushNow } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
           if (ids.length) addContactsToList(lid, ids);
         }
       }
+      await flushNow();
       return NextResponse.json(result);
     }
 
@@ -58,6 +60,7 @@ export async function POST(req: NextRequest) {
     if (Array.isArray(body.list_ids) && body.list_ids.length) {
       setContactLists(contact.id, body.list_ids);
     }
+    await flushNow();
     return NextResponse.json({ ...contact, list_ids: body.list_ids || [] });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -73,6 +76,7 @@ export async function PUT(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
     const updated = updateContact(id, patch);
     if (!updated) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+    await flushNow();
     return NextResponse.json(updated);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -87,6 +91,7 @@ export async function DELETE(req: NextRequest) {
     const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
     if (!ids.length) return NextResponse.json({ error: 'Contact id(s) required' }, { status: 400 });
     const removed = deleteContacts(ids);
+    await flushNow();
     return NextResponse.json({ success: true, removed });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

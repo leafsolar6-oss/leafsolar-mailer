@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { flushNow } from '@/lib/store';
 import { restoreFromPayload, writeBackupFile } from '@/lib/backup';
 
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
     if (!result.ok) {
       return NextResponse.json({ error: result.error || 'Invalid backup file' }, { status: 400 });
     }
+    await flushNow();
     return NextResponse.json({ success: true, counts: result.counts });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Restore failed' }, { status: 500 });

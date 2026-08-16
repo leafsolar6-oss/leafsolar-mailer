@@ -6,6 +6,7 @@ import {
 } from '@/lib/queries';
 import { bulkAddContacts } from '@/lib/queries';
 import { requireAuth } from '@/lib/auth';
+import { flushNow } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,12 +34,14 @@ export async function POST(req: NextRequest) {
     // Remove contacts from a list
     if (body.action === 'removeContacts') {
       const removed = removeContactsFromList(body.listId, body.contactIds || []);
+      await flushNow();
       return NextResponse.json({ success: true, removed });
     }
 
     // Add existing contacts to a list
     if (body.action === 'addContacts') {
       const count = addContactsToList(body.listId, body.contactIds || []);
+      await flushNow();
       return NextResponse.json({ success: true, count });
     }
 
@@ -58,18 +61,21 @@ export async function POST(req: NextRequest) {
           .map(c => c.id);
         if (ids.length) addContactsToList(body.listId, ids);
       }
+      await flushNow();
       return NextResponse.json(result);
     }
 
     // Rename / update list
     if (body.action === 'update') {
       updateListMeta(body.listId, { name: body.name, description: body.description });
+      await flushNow();
       return NextResponse.json({ success: true });
     }
 
     // Create list
     if (!body.name) return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     const list = createList(body.name, body.description || '');
+    await flushNow();
     return NextResponse.json(list);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

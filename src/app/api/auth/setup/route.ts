@@ -3,7 +3,7 @@ import {
   isAuthConfigured, setupAdmin, createSessionToken, applySessionCookie, getAuthEmail,
 } from '@/lib/auth';
 import { setSMTPSettings } from '@/lib/queries';
-import { whenStoreReady } from '@/lib/store';
+import { whenStoreReady, flushNow } from '@/lib/store';
 import type { SMTPSettings } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     const token = createSessionToken();
+    await flushNow(); // persist the account + session BEFORE responding
     const res = NextResponse.json({ success: true, email });
     return applySessionCookie(res, token);
   } catch (err: any) {

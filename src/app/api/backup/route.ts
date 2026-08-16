@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { flushNow } from '@/lib/store';
 import {
   createBackupPayload, writeBackupFile, listServerBackups, readServerBackupFile,
 } from '@/lib/backup';
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const file = writeBackupFile();
+    await flushNow();
     return NextResponse.json({ success: true, file, meta: createBackupPayload().meta });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Backup failed' }, { status: 500 });
