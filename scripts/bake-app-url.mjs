@@ -12,7 +12,11 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const shellPath = path.join(__dirname, '..', 'www', 'index.html');
-const url = (process.env.APP_URL || 'https://leafsolar-mailer.vercel.app').replace(/\/$/, '');
+// Default = the branded domain (mailer.leafsolar.ng), which is the same
+// Vercel deployment but reachable from networks that can't route to
+// *.vercel.app (common on some Nigerian ISPs/mobile networks). Override with
+// APP_URL env if you prefer a different URL.
+const url = (process.env.APP_URL || 'https://mailer.leafsolar.ng').replace(/\/$/, '');
 
 let html = fs.readFileSync(shellPath, 'utf-8');
 

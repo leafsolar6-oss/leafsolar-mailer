@@ -47,7 +47,7 @@ jobs:
       - name: Resolve APP_URL
         id: appurl
         run: |
-          URL="${{ github.event.inputs.app_url || vars.APP_URL || secrets.APP_URL || 'https://leafsolar-mailer.vercel.app' }}"
+          URL="${{ github.event.inputs.app_url || vars.APP_URL || secrets.APP_URL || 'https://mailer.leafsolar.ng' }}"
           echo "value=$URL" >> "$GITHUB_OUTPUT"
           echo "APP_URL=$URL"
 
