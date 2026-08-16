@@ -26,6 +26,15 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     cleartext: false,
+    // CRITICAL: the bundled shell navigates the WebView to the hosted app
+    // (window.location.replace). Without allowNavigation, Capacitor's
+    // WebViewClient blocks navigation to hosts not listed here and the app
+    // sits on the loading screen forever. List every host the app may load.
+    allowNavigation: [
+      'mailer.leafsolar.ng',
+      'www.leafsolar.ng',
+      'leafsolar-mailer.vercel.app',
+    ],
   },
   plugins: {
     SplashScreen: {
