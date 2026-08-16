@@ -57,7 +57,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 glass safe-top">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 safe-top bg-white border-b border-gray-200 shadow-sm">
         <div className="flex items-center justify-between px-4 h-16">
           <Link href="/" className="flex items-center gap-2.5">
             <Logo />
@@ -68,7 +68,8 @@ export default function Sidebar() {
           </Link>
           <div className="flex items-center gap-2">
             <StatusPill online={online} pending={pending} />
-            <button onClick={() => setOpen(!open)} className="p-2 rounded-xl hover:bg-black/5">
+            <button onClick={() => setOpen(!open)} aria-label={open ? 'Close menu' : 'Open menu'}
+              className="p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 shadow-sm transition-colors">
               {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
@@ -76,7 +77,7 @@ export default function Sidebar() {
       </div>
 
       {open && (
-        <div className="lg:hidden fixed inset-0 bg-black/40 z-40" onClick={() => setOpen(false)} />
+        <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setOpen(false)} />
       )}
 
       <aside className={`
@@ -85,15 +86,21 @@ export default function Sidebar() {
         ${open ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0
       `}>
-        <div className="h-full m-3 lg:m-4 rounded-3xl glass shadow-xl flex flex-col overflow-hidden">
-          <div className="p-5 flex items-center gap-3">
-            <Logo size={44} />
-            <div>
-              <p className="font-extrabold text-lg leading-tight">Leaf Solar</p>
-              <p className="text-xs text-emerald-700 font-medium flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Mailer Pro
-              </p>
+        <div className="h-full m-3 lg:m-4 rounded-3xl bg-white border border-gray-200/80 shadow-2xl flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between p-5 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <Logo size={44} />
+              <div>
+                <p className="font-extrabold text-lg leading-tight">Leaf Solar</p>
+                <p className="text-xs text-emerald-700 font-medium flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Mailer Pro
+                </p>
+              </div>
             </div>
+            <button onClick={() => setOpen(false)} aria-label="Close menu"
+              className="lg:hidden p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600">
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
           <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
