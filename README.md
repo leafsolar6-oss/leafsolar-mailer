@@ -147,8 +147,26 @@ The scheduler endpoint also runs when called manually — you can hit
 ## ☁️ Deploying to Vercel
 
 1. **Push to GitHub** — Vercel imports the repo and auto-detects Next.js.
-2. **Create Vercel KV** (recommended for durable data): Dashboard → **Storage →
-   Create Database → KV (Upstash)**. Copy the REST URL + token.
+2. **Set up durable storage** (recommended so data survives serverless cold
+   starts). "Vercel KV" no longer exists — pick **one** of:
+
+   **Option A — Supabase (easiest, no Vercel marketplace):**
+   1. Create a free project at [supabase.com](https://supabase.com) (no card)
+   2. Open the **SQL Editor** and run:
+      ```sql
+      create table if not exists app_state (
+        id text primary key,
+        payload jsonb,
+        updated_at timestamptz default now()
+      );
+      ```
+   3. In Project → Settings → **API**, copy the **Project URL** and
+      **service_role key**, and add them as env vars (below).
+
+   **Option B — Upstash Redis** (successor to Vercel KV): create a Redis
+   database at [upstash.com](https://upstash.com) (or Vercel Marketplace →
+   "Upstash Redis") and use its REST URL + token.
+
 3. **Add environment variables** in Project → Settings → Environment Variables
    (Production):
 
@@ -157,18 +175,19 @@ The scheduler endpoint also runs when called manually — you can hit
    | `APP_URL` | `https://mailer.leafsolar.ng` |
    | `DATABASE_PATH` | `/tmp/leafsolar-data.json` |
    | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM_NAME` / `SMTP_FROM_EMAIL` | your Truehost/Cloudoon mailbox |
-   | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | from your Vercel KV |
+   | `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | *(Option A)* from Supabase |
+   | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | *(Option B)* from Upstash Redis |
    | `CRON_SECRET` | a long random string |
 
 4. **Redeploy.** On first visit you'll be taken to the **Welcome** page — create
    your admin account (this unlocks the app).
 
-> **Why Vercel KV?** On serverless, the file system is read-only except `/tmp`,
-> which is wiped between cold starts. When `KV_REST_API_URL`/`KV_REST_API_TOKEN`
-> are set, the app mirrors the whole JSON store to a single KV key
-> (`leafsolar:data`) — hydrated on cold start, flushed after writes. Without KV
-> the app still works locally and on a VPS (persistent `./data/` folder), and on
-> Vercel it degrades to per-instance memory (data resets).
+> **Why durable storage?** On serverless, the file system is read-only except
+> `/tmp`, which is wiped between cold starts. With Supabase or Upstash
+> configured, the app mirrors the whole JSON store (contacts, campaigns,
+> settings…) to the external store — hydrated on cold start, flushed after
+> writes. Without it the app still works locally and on a VPS (persistent
+> `./data/` folder); on Vercel it degrades to per-instance memory (data resets).
 
 ## 🛠 Tech Stack
 

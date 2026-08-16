@@ -10,14 +10,16 @@
  *   - Vercel/serverless: /tmp/leafsolar-data.json  (ephemeral per instance)
  *   - Local/VPS:          ./data/leafsolar-data.json (persistent)
  *
- * NOTE on Vercel: /tmp is ephemeral and not shared across invocations, so
- * data may reset between cold starts. For durable production storage, hook
- * this up to Vercel Postgres/KV or any external database. The store is
- * intentionally simple to make that swap straightforward.
+ * Durable mirroring on serverless: the whole store is mirrored to any
+ * configured external store (hydrated on cold start, flushed after writes):
+ *   - Upstash Redis / Vercel KV (KV_REST_API_URL + KV_REST_API_TOKEN)
+ *   - Supabase Postgres REST (SUPABASE_URL + SUPABASE_SERVICE_KEY)
+ * Both can be configured at once; reads pull from the first that has data.
  */
 import fs from 'fs';
 import path from 'path';
 import { kvConfigured, kvGet, kvPut } from './kv-persist';
+import { supabaseConfigured, supabaseGet, supabasePut } from './supabase-persist';
 import type {
   Contact, EmailList, Campaign, Template, Integration,
   EmailLog, SMTPSettings, OutboxItem, TrackingEvent,
@@ -95,42 +97,64 @@ function writeFile(): void {
   }
 }
 
-/** Debounced push of the whole store to Vercel KV (skipped until hydrated so
- *  a cold-start seed never overwrites the KV snapshot). */
-function scheduleKvFlush(): void {
-  if (!kvConfigured() || !hydrated) return;
+/** Any durable store configured? (Vercel KV / Upstash Redis, or Supabase.) */
+function anyPersistConfigured(): boolean {
+  return kvConfigured() || supabaseConfigured();
+}
+
+/** Pulls the latest snapshot from the first configured store that has one. */
+async function pullSnapshot(): Promise<string | null> {
+  if (kvConfigured()) {
+    try { const v = await kvGet(); if (v) return v; } catch { /* try next */ }
+  }
+  if (supabaseConfigured()) {
+    try { const v = await supabaseGet(); if (v) return v; } catch { /* try next */ }
+  }
+  return null;
+}
+
+/** Mirrors the snapshot to every configured durable store. */
+function pushSnapshot(value: string): void {
+  if (kvConfigured()) kvPut(value).catch(() => { /* unavailable */ });
+  if (supabaseConfigured()) supabasePut(value).catch(() => { /* unavailable */ });
+}
+
+/** Debounced push of the whole store (skipped until hydrated so a cold-start
+ *  seed never overwrites the durable snapshot). */
+function scheduleFlush(): void {
+  if (!anyPersistConfigured() || !hydrated) return;
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = setTimeout(() => {
     if (!cache) return;
-    kvPut(JSON.stringify(cache)).catch(() => { /* KV unavailable */ });
+    pushSnapshot(JSON.stringify(cache));
   }, 800);
 }
 
 let readyPromise: Promise<void> | null = null;
 
-/** Hydrates the store from Vercel KV (once). Resolves when ready. */
+/** Hydrates the store from the durable store (once). Resolves when ready. */
 function hydrate(): Promise<void> {
   if (!readyPromise) {
     readyPromise = (async () => {
-      if (!kvConfigured()) {
+      if (!anyPersistConfigured()) {
         hydrated = true;
         return;
       }
       try {
-        const raw = await kvGet();
+        const raw = await pullSnapshot();
         if (raw) {
           let parsed: Partial<DBShape> = {};
           try { parsed = JSON.parse(raw); } catch { /* invalid snapshot */ }
           cache = { ...emptyDB(), ...parsed };
           writeFile();
-          runReadyHooks(); // re-seed any templates missing from the KV snapshot
+          runReadyHooks(); // re-seed any templates missing from the snapshot
         }
-        // KV empty -> keep current cache (already seeded); flush below persists it.
+        // Snapshot empty -> keep current cache (already seeded); flush persists it.
       } catch {
-        // KV unavailable — fall back to in-memory/file store.
+        // Durable store unavailable — fall back to in-memory/file store.
       } finally {
         hydrated = true;
-        scheduleKvFlush();
+        scheduleFlush();
       }
     })();
   }
@@ -170,7 +194,7 @@ function load(): DBShape {
 function persist() {
   if (!cache) return;
   writeFile();
-  scheduleKvFlush();
+  scheduleFlush();
 }
 
 const store = {
