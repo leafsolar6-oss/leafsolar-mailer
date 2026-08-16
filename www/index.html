@@ -41,7 +41,7 @@
       border: none; cursor: pointer;
     }
     .btn.ghost { background: transparent; color: #fde68a; border: 1px solid rgba(253,230,138,0.5); }
-    .foot { margin-top: 18px; font-size: 12px; color: #a7f3d0; }
+    .foot { margin-top: 18px; font-size: 12px; color: #a7f3d0; word-break: break-all; }
     .foot a { color: #fde68a; }
   </style>
 </head>
@@ -69,38 +69,38 @@
   <script>
     // This shell is bundled INSIDE the APK. It probes the hosted app, then
     // navigates the WebView to it (allowed via capacitor allowNavigation).
-    // If it can't connect, it shows clear guidance instead of a blank page.
-    // https://mailer.leafsolar.ng is replaced at build time by scripts/bake-app-url.mjs.
-    var APP_URL = '__APP_URL__';
+    // It tries multiple hosts and uses the first that responds, so a blocked
+    // DNS entry for one host doesn't break the app. https://mailer.leafsolar.ng is replaced
+    // at build time by scripts/bake-app-url.mjs.
+    var PRIMARY = '__APP_URL__';
+    var HOSTS = [PRIMARY, 'https://leafsolar-mailer.vercel.app'];
     var TRIES = 0;
 
     var hints = [
       'Check your phone\u2019s Date & Time is set to Automatic (Settings \u2192 Date & time). A wrong clock blocks secure connections.',
       'Try switching between WiFi and mobile data.',
+      'Update \u201cAndroid System WebView\u201d in the Play Store.',
       'If you\u2019re still stuck, tap "Open in browser" below.',
     ];
 
-    function showErr(msg) {
+    function showErr(msg, bestHost) {
       document.getElementById('spinner').style.display = 'none';
       document.getElementById('status').textContent = 'Connection problem';
       document.getElementById('errmsg').textContent = msg || 'Your phone couldn\u2019t connect to the server.';
-      document.getElementById('browser').href = APP_URL;
+      var browser = document.getElementById('browser');
+      browser.href = bestHost || PRIMARY;
       var ul = document.getElementById('hints');
       ul.innerHTML = '';
       hints.forEach(function (h) { var li = document.createElement('li'); li.textContent = h; ul.appendChild(li); });
       document.getElementById('foot').innerHTML =
-        'Server: <a href="' + APP_URL + '">' + APP_URL + '</a>';
+        'Server: <a href="' + (bestHost || PRIMARY) + '">' + (bestHost || PRIMARY) + '</a>';
       document.getElementById('err').style.display = 'block';
     }
 
-    function go() {
-      window.location.replace(APP_URL);
-    }
-
-    function probe() {
-      return fetch(APP_URL + '/api/auth/status', {
+    function probe(host) {
+      return fetch(host + '/api/auth/status', {
         mode: 'no-cors',
-        signal: AbortSignal.timeout(9000)
+        signal: AbortSignal.timeout(7000)
       }).then(function () { return true; }).catch(function () { return false; });
     }
 
@@ -114,14 +114,23 @@
         showErr('You appear to be offline. Turn on mobile data or WiFi and try again.');
         return;
       }
-      var ok = await probe();
-      if (!ok && TRIES < 2) ok = await probe();
-      if (ok) { go(); return; }
+
+      // Try each host in order; navigate to the first that responds.
+      for (var i = 0; i < HOSTS.length; i++) {
+        var host = HOSTS[i];
+        var ok = await probe(host);
+        if (!ok && TRIES < 2) ok = await probe(host);
+        if (ok) {
+          window.location.replace(host);
+          return;
+        }
+      }
+
       if (navigator.onLine === false) {
         showErr('You appear to be offline. Turn on mobile data or WiFi and try again.');
         return;
       }
-      showErr('The server didn\u2019t respond from your phone.');
+      showErr('The server didn\u2019t respond from your phone.', PRIMARY);
     }
 
     document.getElementById('retry').addEventListener('click', connect);
