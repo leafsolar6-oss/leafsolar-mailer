@@ -2,14 +2,20 @@ import { v4 as uuidv4 } from 'uuid';
 import store from './store';
 import type {
   Contact, EmailList, Campaign, Template,
-  Integration, EmailLog, SMTPSettings, ImportResult, CampaignStats,
+  Integration, EmailLog, SMTPSettings, ImportResult, CampaignStats, TrackingEvent,
 } from '@/types';
 
 const now = () => new Date().toISOString();
 
+/** Public base URL of the deployed app — used for tracking links, unsubscribe
+ *  links and the Capacitor APK. Falls back to the production URL. */
+export function getBaseUrl(): string {
+  return process.env.APP_URL || 'https://mailer.leafsolar.ng';
+}
+
 // ==================== CONTACTS ====================
 
-export function getContacts(search?: string, listId?: string): Contact[] {
+export function getContacts(search?: string, listId?: string, includeLists = false): Contact[] {
   let rows = store.contacts.all();
 
   if (listId) {
@@ -24,6 +30,10 @@ export function getContacts(search?: string, listId?: string): Contact[] {
       (c.name || '').toLowerCase().includes(q) ||
       (c.company || '').toLowerCase().includes(q)
     );
+  }
+
+  if (includeLists) {
+    rows = rows.map(c => ({ ...c, list_ids: store.lists.contactListIds(c.id) }));
   }
 
   return rows;
@@ -85,6 +95,43 @@ export function bulkAddContacts(contacts: Partial<Contact>[]): ImportResult {
 
 export function deleteContact(id: string): void {
   store.contacts.remove(id);
+}
+
+export function deleteContacts(ids: string[]): number {
+  let removed = 0;
+  for (const id of ids) {
+    if (store.contacts.byId(id)) {
+      store.contacts.remove(id);
+      removed++;
+    }
+  }
+  return removed;
+}
+
+export function updateContact(id: string, patch: Partial<Contact>): Contact | null {
+  const existing = store.contacts.byId(id);
+  if (!existing) return null;
+  const { list_ids, ...fields } = patch;
+  if (Object.keys(fields).length > 0) store.contacts.update(id, fields);
+  if (Array.isArray(list_ids)) {
+    store.lists.setContactLists(id, [...new Set(list_ids)]);
+  }
+  return { ...store.contacts.byId(id)!, list_ids: store.lists.contactListIds(id) };
+}
+
+// ==================== CONTACT ↔ LIST MEMBERSHIP ====================
+
+export function getListsForContact(contactId: string): EmailList[] {
+  const ids = new Set(store.lists.contactListIds(contactId));
+  return store.lists.all().filter(l => ids.has(l.id));
+}
+
+export function setContactLists(contactId: string, listIds: string[]): void {
+  store.lists.setContactLists(contactId, listIds);
+}
+
+export function bulkAssignContacts(listId: string, contactIds: string[]): number {
+  return store.lists.addContacts(listId, contactIds);
 }
 
 export function getContactCount(): number {
@@ -157,7 +204,7 @@ export function createCampaign(data: Partial<Campaign>): Campaign {
     failed_count: 0,
     status: data.status || 'draft',
     list_ids: data.list_ids || [],
-    scheduled_at: null,
+    scheduled_at: data.scheduled_at || null,
     sent_at: null,
     created_at: now(),
     updated_at: now(),
@@ -281,9 +328,56 @@ export function addEmailLog(log: Partial<EmailLog>): EmailLog {
     error: log.error || '',
     sent_at: log.sent_at || null,
     created_at: now(),
+    tracking_id: log.tracking_id || null,
+    opened_at: null,
+    clicked_at: null,
+    open_count: 0,
+    click_count: 0,
   };
   store.logs.add(entry);
   return entry;
+}
+
+// ==================== TRACKING (opens & clicks) ====================
+
+export function findLogByTrackingId(trackingId: string): EmailLog | null {
+  return store.logs.byTrackingId(trackingId) || null;
+}
+
+export function recordOpen(trackingId: string): void {
+  const log = store.logs.byTrackingId(trackingId);
+  if (!log) return;
+  const ts = now();
+  store.logs.update(log.id, {
+    opened_at: log.opened_at || ts,
+    open_count: (log.open_count || 0) + 1,
+  });
+  store.events.add({ id: uuidv4(), log_id: log.id, type: 'open', url: null, created_at: ts });
+}
+
+export function recordClick(trackingId: string, url: string): void {
+  const log = store.logs.byTrackingId(trackingId);
+  if (!log) return;
+  const ts = now();
+  store.logs.update(log.id, {
+    clicked_at: log.clicked_at || ts,
+    click_count: (log.click_count || 0) + 1,
+  });
+  store.events.add({ id: uuidv4(), log_id: log.id, type: 'click', url, created_at: ts });
+}
+
+export function getTrackingEvents(logId?: string, limit = 500): TrackingEvent[] {
+  return store.events.all(logId, limit);
+}
+
+// ==================== UNSUBSCRIBE ====================
+
+/** Marks a contact unsubscribed (suppressed from future sends). */
+export function setContactStatus(email: string, status: Contact['status']): boolean {
+  const contact = store.contacts.byEmail(email);
+  if (!contact) return false;
+  store.contacts.update(contact.id, { status });
+  return true;
 }
 
 // ==================== STATS ====================
@@ -304,6 +398,12 @@ export function getStats(): CampaignStats {
 }
 
 // ==================== SEED DEFAULT TEMPLATES ====================
+// The full professional library (108 templates reflecting www.leafsolar.ng)
+// lives in template-library.ts and is seeded idempotently by name — existing
+// databases get the new templates added without duplicating or overwriting
+// anything the user has customized.
+
+import { TEMPLATE_LIBRARY } from './template-library';
 
 export function seedDefaultTemplates(): void {
   if (store.templates.all().length > 0) return;
@@ -415,4 +515,30 @@ export function seedDefaultTemplates(): void {
   }
 }
 
+/** Seeds the professional template library. Idempotent: only adds templates
+ *  whose names aren't already present, so user edits are never overwritten. */
+export function seedTemplateLibrary(): void {
+  const existing = new Set(store.templates.all().map(t => t.name));
+  let added = 0;
+  for (const t of TEMPLATE_LIBRARY) {
+    if (existing.has(t.name)) continue;
+    const tmpl: Template = {
+      id: uuidv4(),
+      name: t.name,
+      subject: t.subject,
+      body: t.body,
+      category: t.category,
+      is_default: true,
+      created_at: now(),
+    };
+    store.templates.add(tmpl);
+    added++;
+  }
+  if (added > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[templates] seeded ${added} professional templates`);
+  }
+}
+
 seedDefaultTemplates();
+seedTemplateLibrary();

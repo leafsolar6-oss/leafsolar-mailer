@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Mail, Clock, CheckCircle2, XCircle, TrendingUp, Trash2, Send } from 'lucide-react';
+import { Plus, Mail, Clock, CheckCircle2, XCircle, TrendingUp, Trash2, Send, CalendarClock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Campaign } from '@/types';
 import { offlineFetch } from '@/lib/offline';
@@ -45,7 +45,7 @@ export default function CampaignsPage() {
     draft: { icon: Clock, cls: 'bg-gray-100 text-gray-600', label: 'Draft' },
     sending: { icon: TrendingUp, cls: 'bg-blue-50 text-blue-600', label: 'Sending' },
     sent: { icon: CheckCircle2, cls: 'bg-emerald-50 text-emerald-600', label: 'Sent' },
-    scheduled: { icon: Clock, cls: 'bg-amber-50 text-amber-600', label: 'Scheduled' },
+    scheduled: { icon: CalendarClock, cls: 'bg-amber-50 text-amber-600', label: 'Scheduled' },
     failed: { icon: XCircle, cls: 'bg-red-50 text-red-600', label: 'Failed' },
   };
 
@@ -83,6 +83,11 @@ export default function CampaignsPage() {
                       <span className={`badge ${s.cls}`}><Icon className="w-3 h-3" /> {s.label}</span>
                     </div>
                     <p className="text-sm text-gray-500 truncate">{c.subject}</p>
+                    {c.status === 'scheduled' && c.scheduled_at && (
+                      <p className="text-xs text-amber-600 font-medium mt-0.5 flex items-center gap-1">
+                        <CalendarClock className="w-3 h-3" /> Sends {new Date(c.scheduled_at).toLocaleString()}
+                      </p>
+                    )}
                     {c.status === 'sent' && (
                       <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-xs">
                         <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${progress}%` }} />

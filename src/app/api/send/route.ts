@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendEmail, mergeTemplate } from '@/lib/email';
+import { sendEmail, mergeTemplate, addTrackingToHtml, makeTrackingId } from '@/lib/email';
 import { addEmailLog } from '@/lib/queries';
+import { requireAuth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,8 @@ interface SendBody {
 }
 
 export async function POST(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   try {
     const body = (await req.json()) as SendBody;
 
@@ -28,10 +31,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email body is required' }, { status: 400 });
     }
 
-    const html = mergeTemplate(body.body, {
+    const trackingId = makeTrackingId(body.to, null);
+    const merged = mergeTemplate(body.body, {
       name: body.to_name || '',
       email: body.to,
     });
+    const html = addTrackingToHtml(merged, trackingId);
 
     const result = await sendEmail({
       to: body.to,
@@ -50,6 +55,7 @@ export async function POST(req: NextRequest) {
       status: result.success ? 'sent' : 'failed',
       error: result.error || '',
       sent_at: result.success ? new Date().toISOString() : null,
+      tracking_id: trackingId,
     });
 
     if (!result.success) {

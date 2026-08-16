@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listMessages, listFolders, getImapSettings } from '@/lib/imap';
 import { getSetting, setSetting } from '@/lib/queries';
+import { requireAuth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const folder = req.nextUrl.searchParams.get('folder') || 'INBOX';
   const limit = parseInt(req.nextUrl.searchParams.get('limit') || '30');
   const action = req.nextUrl.searchParams.get('action');
@@ -37,6 +40,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   try {
     const body = await req.json();
     if (body.action === 'test') {

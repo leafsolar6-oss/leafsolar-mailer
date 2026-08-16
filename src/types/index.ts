@@ -9,6 +9,8 @@ export interface Contact {
   status: 'active' | 'unsubscribed' | 'bounced';
   created_at: string;
   updated_at: string;
+  /** Derived list memberships (attached by the API when includeLists=1). */
+  list_ids?: string[];
 }
 
 export interface EmailList {
@@ -58,6 +60,14 @@ export interface Template {
   created_at: string;
 }
 
+/** A template as defined in the static library (no id/timestamps yet). */
+export interface TemplateSeed {
+  name: string;
+  subject: string;
+  body: string;
+  category: string;
+}
+
 export interface Integration {
   id: string;
   platform: string;
@@ -82,6 +92,20 @@ export interface EmailLog {
   status: 'pending' | 'sent' | 'failed' | 'queued';
   error: string;
   sent_at: string | null;
+  created_at: string;
+  /** Unique id embedded in tracking links / pixel for this delivery. */
+  tracking_id: string | null;
+  opened_at: string | null;
+  clicked_at: string | null;
+  open_count: number;
+  click_count: number;
+}
+
+export interface TrackingEvent {
+  id: string;
+  log_id: string;
+  type: 'open' | 'click';
+  url: string | null;
   created_at: string;
 }
 

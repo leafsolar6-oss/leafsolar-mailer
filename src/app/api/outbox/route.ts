@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import store from '@/lib/store';
-import { sendEmail, mergeTemplate } from '@/lib/email';
+import { sendEmail, mergeTemplate, addTrackingToHtml, makeTrackingId } from '@/lib/email';
 import { addEmailLog, bulkAddContacts } from '@/lib/queries';
+import { requireAuth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,8 @@ export const dynamic = 'force-dynamic';
  * and posts them here when back online.
  */
 export async function POST(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   try {
     const body = await req.json();
     const items: any[] = Array.isArray(body.items) ? body.items : [];
@@ -21,10 +24,12 @@ export async function POST(req: NextRequest) {
       const { id, type, payload } = item;
       try {
         if (type === 'send_email') {
-          const html = mergeTemplate(payload.body || '', {
+          const trackingId = makeTrackingId(payload.to || '', payload.campaign_id || null);
+          const merged = mergeTemplate(payload.body || '', {
             name: payload.to_name || '',
             email: payload.to || '',
           });
+          const html = addTrackingToHtml(merged, trackingId);
           const r = await sendEmail({
             to: payload.to,
             subject: payload.subject,
@@ -41,6 +46,7 @@ export async function POST(req: NextRequest) {
             subject: payload.subject,
             status: 'sent',
             sent_at: new Date().toISOString(),
+            tracking_id: trackingId,
           });
         } else if (type === 'add_contacts') {
           bulkAddContacts(payload.contacts || []);
@@ -61,6 +67,8 @@ export async function POST(req: NextRequest) {
 
 // Allow the client to register an outbox item id even before sending
 export async function PUT(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const body = await req.json();
   const item = {
     id: body.id || uuidv4(),

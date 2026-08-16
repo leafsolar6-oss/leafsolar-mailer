@@ -4,8 +4,9 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Users, Mail, ListChecks, FileText,
-  Plug, Settings, Menu, X, Send, Wifi, WifiOff, Inbox
+  Plug, Settings, Menu, X, Send, Wifi, WifiOff, Inbox, DatabaseBackup, LogOut,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { flushOutbox, outboxCount } from '@/lib/offline';
 
 const navItems = [
@@ -17,14 +18,21 @@ const navItems = [
   { href: '/lists', label: 'Lists', icon: ListChecks },
   { href: '/templates', label: 'Templates', icon: FileText },
   { href: '/integrations', label: 'Integrations', icon: Plug },
+  { href: '/backups', label: 'Backups', icon: DatabaseBackup },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
+
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.replace('/login');
+  };
 
   useEffect(() => {
     setOnline(navigator.onLine);
@@ -119,6 +127,10 @@ export default function Sidebar() {
               className="block text-center text-[11px] text-gray-400 mt-2 hover:text-emerald-600">
               www.leafsolar.ng
             </a>
+            <button onClick={logout}
+              className="w-full mt-2 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-gray-400 hover:text-red-500 py-1.5 transition-colors">
+              <LogOut className="w-3.5 h-3.5" /> Sign out
+            </button>
           </div>
         </div>
       </aside>

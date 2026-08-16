@@ -104,9 +104,25 @@ function ListDetailContent() {
   };
 
   const toggle = (id: string) => {
-    const next = new Set(selected);
-    next.has(id) ? next.delete(id) : next.add(id);
-    setSelected(next);
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allVisibleSelected = filtered.length > 0 && selected.size === filtered.length;
+  const toggleAll = () => {
+    setSelected(prev => allVisibleSelected ? new Set() : new Set(filtered.map(c => c.id)));
+  };
+
+  const [addSelected, setAddSelected] = useState<Set<string>>(new Set());
+  const addMany = async () => {
+    if (!addSelected.size) return toast.error('Select contacts to add');
+    await addExisting(Array.from(addSelected));
+    setAddSelected(new Set());
+    setShowAdd(false);
   };
 
   if (loading) return <div className="flex justify-center py-20"><div className="spinner" /></div>;
@@ -127,7 +143,7 @@ function ListDetailContent() {
         </span>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         <button onClick={() => setShowImport(true)} className="btn btn-primary">
           <Upload className="w-4 h-4" /> Import to list
         </button>
@@ -135,9 +151,12 @@ function ListDetailContent() {
           <Plus className="w-4 h-4" /> Add existing
         </button>
         {selected.size > 0 && (
-          <button onClick={() => removeContacts(Array.from(selected))} className="btn btn-danger">
-            <Trash2 className="w-4 h-4" /> Remove ({selected.size})
-          </button>
+          <>
+            <button onClick={() => removeContacts(Array.from(selected))} className="btn btn-danger">
+              <Trash2 className="w-4 h-4" /> Remove ({selected.size})
+            </button>
+            <span className="text-xs text-gray-500">{selected.size} selected</span>
+          </>
         )}
       </div>
 
@@ -171,7 +190,13 @@ function ListDetailContent() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
-                <th className="p-4 w-10"></th>
+                <th className="p-4 w-10">
+                  <input type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleAll}
+                    title={allVisibleSelected ? 'Deselect all' : 'Select all'}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" />
+                </th>
                 <th className="text-left p-4">Contact</th>
                 <th className="text-left p-4 hidden md:table-cell">Company</th>
                 <th className="text-left p-4 hidden sm:table-cell">Source</th>
@@ -227,21 +252,49 @@ function ListDetailContent() {
       )}
 
       {showAdd && (
-        <Modal title="Add existing contacts" onClose={() => setShowAdd(false)}>
+        <Modal title="Add existing contacts" onClose={() => { setShowAdd(false); setAddSelected(new Set()); }}>
           {notInList.length === 0 ? (
             <p className="text-gray-500 text-center py-8">All contacts are already in this list.</p>
           ) : (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {notInList.map(c => (
-                <button key={c.id} onClick={() => addExisting([c.id])}
-                  className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 text-left border border-gray-100">
-                  <div>
-                    <p className="font-semibold text-sm">{c.name || '(no name)'}</p>
-                    <p className="text-xs text-gray-500">{c.email}</p>
-                  </div>
-                  <Plus className="w-4 h-4 text-emerald-600" />
-                </button>
-              ))}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                  <input type="checkbox"
+                    checked={addSelected.size === notInList.length}
+                    onChange={e => setAddSelected(e.target.checked ? new Set(notInList.map(c => c.id)) : new Set())}
+                    className="w-4 h-4 rounded text-emerald-600" />
+                  Select all ({notInList.length})
+                </label>
+                <span className="text-xs text-gray-400">{addSelected.size} selected</span>
+              </div>
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {notInList.map(c => {
+                  const checked = addSelected.has(c.id);
+                  return (
+                    <label key={c.id}
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                        checked ? 'border-emerald-300 bg-emerald-50/60' : 'border-gray-100 hover:bg-gray-50'
+                      }`}>
+                      <input type="checkbox" checked={checked}
+                        onChange={() => setAddSelected(prev => {
+                          const next = new Set(prev);
+                          if (next.has(c.id)) next.delete(c.id); else next.add(c.id);
+                          return next;
+                        })}
+                        className="w-4 h-4 rounded text-emerald-600" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{c.name || '(no name)'}</p>
+                        <p className="text-xs text-gray-500 truncate">{c.email}</p>
+                      </div>
+                      <Plus className={`w-4 h-4 ${checked ? 'text-emerald-600' : 'text-gray-300'}`} />
+                    </label>
+                  );
+                })}
+              </div>
+              <button onClick={addMany} disabled={!addSelected.size}
+                className="btn btn-primary w-full disabled:opacity-50">
+                Add {addSelected.size || ''} to list
+              </button>
             </div>
           )}
         </Modal>

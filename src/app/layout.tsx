@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import Sidebar from '@/components/Sidebar';
 import PWARegister from '@/components/PWARegister';
 import InstallPrompt from '@/components/InstallPrompt';
+import SchedulerPoller from '@/components/SchedulerPoller';
 
 export const metadata: Metadata = {
   title: 'Leaf Solar Mailer — Bulk Email Marketing',
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <PWARegister />
+        <SchedulerPoller />
         <div className="flex min-h-screen">
           <Sidebar />
           <main className="flex-1 lg:ml-[286px] safe-top safe-bottom">

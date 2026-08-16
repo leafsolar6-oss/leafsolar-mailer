@@ -1,50 +1,70 @@
 # ☀️ Leaf Solar Mailer — Bulk Email Marketing App
 
-A full-featured bulk email marketing platform built with **Next.js 14**, designed for [Leaf Solar](https://www.leafsolar.ng). It can be installed as an Android app (APK) via PWA or wrapped with Capacitor.
+A full-featured bulk email marketing platform built with **Next.js 16**, designed for [Leaf Solar](https://www.leafsolar.ng). It can be installed as an Android app (APK) via PWA or wrapped with Capacitor.
 
 ## ✨ Features
+
+### 🔐 Admin Account & Security
+- First-run **Welcome** page creates your admin account (email + password, salted & hashed)
+- **Login** page protects the whole workspace; API routes are token-checked
+- Change password and sign out from Settings
+- Session cookie is httpOnly — the token never reaches JavaScript
 
 ### 📧 Email Campaigns
 - Create, edit, and send bulk email campaigns
 - Rich text (WYSIWYG) email editor
 - Personalization tags: `{{name}}`, `{{email}}`, `{{company}}`
-- 5 pre-built solar industry email templates
-- Campaign draft, send, and delivery tracking
-- Delivery logs with success/failure status
+- **108 professional templates** reflecting the real content of www.leafsolar.ng
+  (solar packages, appliances, offers, newsletters, follow-ups, seasonal, welcome, trust — all with
+  Leaf Solar's emerald/amber brand, email-safe HTML and live store links)
+- **Campaign scheduling** — pick a date & time; the app auto-sends when due
+- **Open & click tracking** — a tracking pixel and rewritten links on every send; see who opened,
+  who clicked, and how many times
+- **Unsubscribe links** — every send includes a `{{unsubscribe}}` link; recipients can opt out on a
+  public page and are suppressed from future sends
+- **Delivery reports** — export the full per-recipient log (status, opens, clicks) as CSV
+- Campaign draft, send, scheduled and delivery tracking
 
 ### 👥 Contact Management
-- Add contacts manually
-- **Import from external sources:**
-  - CSV files
-  - Excel spreadsheets (.xlsx, .xls)
-  - Plain text files (.txt)
-  - vCard files (.vcf)
-  - Paste email addresses directly
-- Search and filter contacts
-- Export contacts to CSV
-- Organize contacts into email lists
+- Add contacts manually, edit them, assign them to multiple lists at once
+- **Import from external sources:** CSV, Excel (.xlsx/.xls), TXT, vCard (.vcf), or paste emails
+- Imports can be assigned directly to a list
+- **Select all** checkboxes + bulk actions: add/remove from lists, export, delete
+- Contact cards show which lists each contact belongs to (list chips)
+- Search and filter contacts; export to CSV
+- Organize contacts into email lists; list pages support select-all, bulk add-existing and bulk remove
 
 ### 🔌 Marketing Platform Integrations (API Leads)
 Sync leads directly from popular marketing platforms:
-- **Mailchimp** — sync audience subscribers
-- **Brevo (Sendinblue)** — import contacts
-- **HubSpot** — import CRM contacts
-- **Mailgun** — import mailing list members
-- **ConvertKit** — sync subscribers
-- **ActiveCampaign** — import CRM contacts
-- **Custom API/Webhook** — connect to any REST API endpoint
+- **Mailchimp**, **Brevo (Sendinblue)**, **HubSpot**, **Mailgun**, **ConvertKit**, **ActiveCampaign**, **Custom API/Webhook**
+- **Social lead ads:** Facebook/Meta, Instagram, LinkedIn, X/Twitter, TikTok, YouTube, Pinterest, Snapchat
+- **Messaging:** WhatsApp Business Cloud, Telegram
 
 ### ⚙️ Email Sending
-- SMTP configuration with quick presets (Gmail, Outlook, Brevo, SendGrid, Mailgun, Zoho, etc.)
+- SMTP configuration with quick presets (Truehost/Cloudoon default, Gmail, Outlook, Brevo, SendGrid, Mailgun, Zoho, etc.)
 - Connection testing before saving
 - Pooled connections with rate limiting for bulk sending
 - Configurable sender name, from email, and reply-to
+- Single-email **Compose** page with contact autocomplete and delivery logging
+
+### 💾 Backups & Cloud Sync
+- **Download** a full JSON backup of everything (contacts, lists, campaigns, templates, integrations, logs)
+- **Save server snapshots** (kept locally, last 20) and download them
+- **Restore** from any previous backup file (safety snapshot taken first)
+- **Automatic backups** after every campaign send and contact import (toggle in Settings)
+- **Cloud backups:** save a webhook URL (e.g. Zapier → Google Drive/Dropbox) and push backups to the
+  cloud with one click; direct links to Drive, Dropbox and OneDrive
+
+### 📊 Analytics
+- Per-campaign dashboard: recipients, delivered, failed, opened, clicked, engaged (with rates)
+- Per-recipient engagement log (open/click counts) in the campaign detail page
+- CSV export of the full delivery + engagement report
 
 ### 📱 Android App (APK)
 - Progressive Web App (PWA) — install directly from Chrome
-- Standalone display with app icon
-- Offline caching of UI shell
-- Capacitor config included for native APK builds
+- Standalone display with app icon; offline caching of UI shell
+- Offline outbox queues sends/contact adds while offline and flushes on reconnect
+- Capacitor config included for native APK builds (loads the live app from `APP_URL`)
 
 ## 🚀 Quick Start
 
@@ -60,7 +80,24 @@ npm run build
 npm start
 ```
 
-Visit `http://localhost:3000`.
+Visit `http://localhost:3000` — you'll be taken to the **Welcome** page to create your admin account.
+
+## ⚙️ SMTP Setup
+
+Go to **Settings** and configure your SMTP server (Truehost/Cloudoon is pre-filled for `mail.leafsolar.ng`).
+Common providers:
+
+| Provider | Host | Port | Security |
+|----------|------|------|----------|
+| Truehost / Cloudoon | mail.leafsolar.ng | 587 | TLS |
+| Gmail | smtp.gmail.com | 587 | TLS |
+| Outlook/365 | smtp.office365.com | 587 | TLS |
+| Brevo | smtp-relay.brevo.com | 587 | TLS |
+| SendGrid | smtp.sendgrid.net | 587 | TLS |
+| Mailgun | smtp.mailgun.org | 587 | TLS |
+| Zoho | smtp.zoho.com | 465 | SSL |
+
+> **Note:** For Gmail, use an [App Password](https://myaccount.google.com/apppasswords) instead of your regular password.
 
 ## 📦 Building the APK
 
@@ -78,111 +115,30 @@ Visit `http://localhost:3000`.
 
 ### Option C: Capacitor (Full native build)
 ```bash
-# Install Capacitor
 npm install @capacitor/core @capacitor/cli @capacitor/android
-
-# Build the web app (static export)
 npm run build
-
-# Add Android platform
 npx cap add android
-
-# Sync web assets
 npx cap sync android
-
-# Open in Android Studio to build APK
 npx cap open android
 ```
 In Android Studio: **Build → Build Bundle(s) / APK(s) → Build APK(s)**
 
-## ⚙️ SMTP Setup
+## ⏰ Scheduling & Cron
 
-Go to **Settings** and configure your SMTP server. Common providers:
+Scheduled campaigns are auto-sent by:
+1. The in-app poller (every 60s while the app is open), and
+2. The **Vercel cron** (`/api/scheduler` every 10 minutes — see `vercel.json`).
 
-| Provider | Host | Port | Security |
-|----------|------|------|----------|
-| Gmail | smtp.gmail.com | 587 | TLS |
-| Outlook/365 | smtp.office365.com | 587 | TLS |
-| Brevo | smtp-relay.brevo.com | 587 | TLS |
-| SendGrid | smtp.sendgrid.net | 587 | TLS |
-| Mailgun | smtp.mailgun.org | 587 | TLS |
-| Zoho | smtp.zoho.com | 465 | SSL |
-
-> **Note:** For Gmail, use an [App Password](https://myaccount.google.com/apppasswords) instead of your regular password.
-
-## 🔧 API Integration Setup
-
-### Mailchimp
-1. Go to **Account → Extras → API keys**
-2. Create an API key (format: `abc123-us14`)
-3. The data center is the suffix after `-` (e.g., `us14`)
-
-### Brevo
-1. Go to **SMTP & API → API Keys**
-2. Create a v3 API key
-
-### HubSpot
-1. Go to **Settings → Integrations → Private Apps**
-2. Create a private app with `crm.objects.contacts.read` scope
-3. Copy the access token
-
-### Custom API
-- Provide a REST endpoint returning JSON
-- Response can be an array or an object with `contacts`/`data`/`results` array
-- Configure which field contains the email address
+Self-hosting without Vercel cron? Call `/api/scheduler` with `Authorization: Bearer <CRON_SECRET>` on your own schedule.
 
 ## 🛠 Tech Stack
-- **Framework:** Next.js 14 (App Router)
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS
-- **Database:** SQLite (via better-sqlite3)
-- **Email:** Nodemailer (SMTP)
+- **Framework:** Next.js 16 (App Router), React 19, TypeScript
+- **Styling:** Tailwind CSS 4
+- **Database:** Zero-dependency JSON store (Vercel-safe; swap for Postgres/KV easily)
+- **Email:** Nodemailer (SMTP) + imapflow/mailparser (inbox)
 - **File Parsing:** Papa Parse (CSV), SheetJS (Excel)
 - **PWA:** Service Worker, Web App Manifest
 - **Mobile:** Capacitor config for APK builds
-
-## 📂 Project Structure
-```
-src/
-├── app/                    # Next.js App Router pages
-│   ├── api/               # API routes
-│   │   ├── campaigns/     # Campaign CRUD + sending
-│   │   ├── contacts/      # Contact CRUD + bulk import
-│   │   ├── import/        # File upload (CSV/Excel/TXT/VCF)
-│   │   ├── integrations/  # Marketing platform sync
-│   │   ├── lists/         # Email list management
-│   │   ├── templates/     # Email templates
-│   │   ├── settings/      # SMTP configuration
-│   │   └── stats/         # Dashboard stats
-│   ├── campaigns/         # Campaign pages
-│   ├── contacts/          # Contacts page
-│   ├── lists/             # Email lists page
-│   ├── templates/         # Templates page
-│   ├── integrations/      # Integrations page
-│   └── settings/          # Settings page
-├── components/             # React components
-├── lib/                    # Database, email service, queries
-└── types/                  # TypeScript types
-```
-
-## 🌐 Deployment to GitHub
-
-```bash
-# Initialize git (if not already)
-git init
-git add .
-git commit -m "Initial commit: Leaf Solar Mailer"
-
-# Add your GitHub repository
-git remote add origin https://github.com/YOUR_USERNAME/leafsolar-mailer.git
-git branch -M main
-git push -u origin main
-```
-
-### Deploy to Vercel (recommended)
-1. Push to GitHub
-2. Go to [vercel.com](https://vercel.com) → Import repository
-3. Deploy — Vercel auto-detects Next.js
 
 ## 📄 License
 MIT © Leaf Solar

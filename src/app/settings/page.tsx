@@ -1,6 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Mail, Send, CheckCircle2, AlertCircle, Info, Smartphone, ShieldCheck } from 'lucide-react';
+import {
+  Mail, Send, CheckCircle2, AlertCircle, Info, Smartphone, ShieldCheck,
+  KeyRound, LogOut, User,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import type { SMTPSettings } from '@/types';
 import { offlineFetch } from '@/lib/offline';
@@ -18,6 +22,9 @@ const PRESETS = [
 ];
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const [account, setAccount] = useState<{ email: string } | null>(null);
+  const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
   const [s, setS] = useState<SMTPSettings>({
     host: 'mail.leafsolar.ng', port: 587, secure: false, user: '', pass: '',
     from_name: 'Leaf Solar', from_email: '',
@@ -32,7 +39,28 @@ export default function SettingsPage() {
       .then(r => { if (r.data) setS(prev => ({ ...prev, ...r.data })); })
       .catch(() => {})
       .finally(() => setLoading(false));
+    fetch('/api/auth/status').then(r => r.json()).then(d => {
+      if (d.email) setAccount({ email: d.email });
+    }).catch(() => {});
   }, []);
+
+  const changePassword = async () => {
+    if (pw.next.length < 6) return toast.error('New password must be at least 6 characters');
+    if (pw.next !== pw.confirm) return toast.error('New passwords do not match');
+    const res = await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'change_password', current_password: pw.current, new_password: pw.next }),
+    });
+    const data = await res.json();
+    if (!res.ok) return toast.error(data.error || 'Failed');
+    toast.success('Password updated');
+    setPw({ current: '', next: '', confirm: '' });
+  };
+
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.replace('/login');
+  };
 
   const applyPreset = (name: string) => {
     const p = PRESETS.find(x => x.name === name);
@@ -191,6 +219,52 @@ export default function SettingsPage() {
         <p className="text-sm text-gray-600">
           The app loads from <strong>https://mailer.leafsolar.ng</strong>. Settings saved here apply to both the website and the APK. If you change SMTP later, no reinstall is needed.
         </p>
+      </div>
+
+      {/* Account & security */}
+      <div className="card overflow-hidden">
+        <div className="p-5 border-b border-gray-100 flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center">
+            <KeyRound className="w-5 h-5 text-violet-600" />
+          </div>
+          <div>
+            <h2 className="font-bold text-gray-900">Account & Security</h2>
+            <p className="text-sm text-gray-500">Your admin login and password</p>
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+              <User className="w-5 h-5 text-emerald-700" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900">{account?.email || 'Admin account'}</p>
+              <p className="text-xs text-gray-500">Sign-in email for this workspace</p>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Current password</label>
+              <input type="password" value={pw.current} onChange={e => setPw({ ...pw, current: e.target.value })} className="input text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">New password</label>
+              <input type="password" value={pw.next} onChange={e => setPw({ ...pw, next: e.target.value })} className="input text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Confirm new password</label>
+              <input type="password" value={pw.confirm} onChange={e => setPw({ ...pw, confirm: e.target.value })} className="input text-sm" />
+            </div>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            <button onClick={changePassword} className="btn btn-primary">
+              <KeyRound className="w-4 h-4" /> Update Password
+            </button>
+            <button onClick={logout} className="btn btn-secondary text-red-600">
+              <LogOut className="w-4 h-4" /> Sign out
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

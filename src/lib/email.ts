@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
-import { getSMTPSettings } from './queries';
+import crypto from 'crypto';
+import { getSMTPSettings, getBaseUrl } from './queries';
 import type { SMTPSettings } from '@/types';
 
 let transporter: nodemailer.Transporter | null = null;
@@ -78,4 +79,52 @@ export async function verifySMTP(settings: SMTPSettings): Promise<{ success: boo
   } catch (err: any) {
     return { success: false, error: err.message || String(err) };
   }
+}
+
+// ==================== OPEN / CLICK TRACKING ====================
+// Each delivery gets a unique tracking id. We rewrite outbound links through
+// /api/t (click redirect) and append a 1x1 pixel (open) plus an unsubscribe
+// link. The tracking id is stored on the EmailLog so per-recipient analytics
+// (who opened, who clicked, how many times) can be shown in the UI.
+
+export function makeTrackingId(email: string, campaignId: string | null): string {
+  const raw = `${campaignId || 'single'}:${email.toLowerCase()}:${Date.now()}:${Math.random()}`;
+  return crypto.createHash('sha256').update(raw).digest('hex').slice(0, 24);
+}
+
+function pixelUrl(trackingId: string): string {
+  return `${getBaseUrl()}/api/t?type=open&id=${trackingId}`;
+}
+
+export function injectTrackingPixel(html: string, trackingId: string): string {
+  const pixel = `<img src="${pixelUrl(trackingId)}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;border:0;" />`;
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${pixel}</body>`);
+  return `${html}${pixel}`;
+}
+
+export function rewriteLinks(html: string, trackingId: string): string {
+  const base = getBaseUrl();
+  return html.replace(
+    /<a\s+([^>]*?)href="(https?:\/\/[^"]+)"([^>]*)>/gi,
+    (_m, before: string, href: string, after: string) => {
+      const target = encodeURIComponent(href);
+      return `<a ${before}href="${base}/api/t?type=click&id=${trackingId}&url=${target}"${after}>`;
+    }
+  );
+}
+
+export function injectUnsubscribeLink(html: string, trackingId: string, label = 'Unsubscribe'): string {
+  const base = getBaseUrl();
+  const link = `<a href="${base}/unsubscribe?id=${trackingId}" style="color:#888888;">${label}</a>`;
+  const withTag = html.replace(/\{\{\s*unsubscribe\s*\}\}/gi, link);
+  if (withTag !== html) return withTag;
+  return `${withTag}\n<p style="font-size:11px;color:#888888;text-align:center;margin:16px 0 0;">${link} · <a href="https://www.leafsolar.ng" style="color:#888888;">Leaf Solar</a></p>`;
+}
+
+/** Applies per-recipient tracking (click rewrite + pixel + unsubscribe). */
+export function addTrackingToHtml(html: string, trackingId: string, opts?: { withUnsubscribe?: boolean }): string {
+  let out = rewriteLinks(html, trackingId);
+  out = injectTrackingPixel(out, trackingId);
+  if (opts?.withUnsubscribe !== false) out = injectUnsubscribeLink(out, trackingId);
+  return out;
 }

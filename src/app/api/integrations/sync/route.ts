@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getIntegrationByPlatform, bulkAddContacts, upsertIntegration } from '@/lib/queries';
+import { requireAuth } from '@/lib/auth';
 
 // Sync leads from connected marketing platforms
 export async function POST(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   try {
     const { platform } = await req.json();
     const integration = getIntegrationByPlatform(platform);

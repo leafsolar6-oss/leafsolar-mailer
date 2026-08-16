@@ -1,13 +1,14 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, Send, Eye, FileText, ListChecks } from 'lucide-react';
+import { Suspense, useEffect, useState, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Save, Send, Eye, FileText, ListChecks, CalendarClock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import type { EmailList, Template } from '@/types';
 
-export default function NewCampaignPage() {
+function NewCampaignPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const editorRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState('');
   const [subject, setSubject] = useState('');
@@ -21,11 +22,27 @@ export default function NewCampaignPage() {
   const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState('');
+  const [scheduleMode, setScheduleMode] = useState<'now' | 'later'>('now');
 
   useEffect(() => {
     fetch('/api/lists').then(r => r.json()).then(setLists);
     fetch('/api/templates').then(r => r.json()).then(setTemplates);
   }, []);
+
+  // Prefill from a template chosen on the Templates page (?template=ID)
+  useEffect(() => {
+    const templateId = searchParams.get('template');
+    if (!templateId) return;
+    fetch('/api/templates').then(r => r.json()).then((all: Template[]) => {
+      const t = all.find((x: Template) => x.id === templateId);
+      if (!t) return;
+      setSubject(t.subject);
+      setName((t.name || 'Campaign').replace(/[^\w ]+/g, '').slice(0, 60));
+      if (editorRef.current) editorRef.current.innerHTML = t.body;
+      toast.success(`Template "${t.name}" applied`);
+    });
+  }, [searchParams]);
 
   const execCmd = (cmd: string, val?: string) => {
     document.execCommand(cmd, false, val);
@@ -46,6 +63,19 @@ export default function NewCampaignPage() {
     if (!body.trim()) { toast.error('Email body is required'); return; }
     if (sendNow && selectedLists.length === 0) { toast.error('Select at least one email list'); return; }
 
+    const scheduled = scheduleMode === 'later' && scheduleAt
+      ? new Date(scheduleAt).toISOString()
+      : null;
+
+    if (scheduleMode === 'later' && !scheduleAt) {
+      toast.error('Pick a date & time to schedule');
+      return;
+    }
+    if (scheduled && scheduled < new Date().toISOString()) {
+      toast.error('Schedule time must be in the future');
+      return;
+    }
+
     if (sendNow) setSending(true);
     else setSaving(true);
 
@@ -57,10 +87,17 @@ export default function NewCampaignPage() {
           name, subject, body,
           sender_name: senderName, sender_email: senderEmail, reply_to: replyTo,
           list_ids: selectedLists,
-          status: sendNow ? 'sending' : 'draft',
+          status: sendNow ? 'sending' : (scheduled ? 'scheduled' : 'draft'),
+          scheduled_at: scheduled,
         }),
       });
       const campaign = await res.json();
+
+      if (scheduled) {
+        toast.success(`Campaign scheduled for ${new Date(scheduled).toLocaleString()}`);
+        router.push('/campaigns');
+        return;
+      }
 
       if (sendNow) {
         const sendRes = await fetch('/api/campaigns/send', {
@@ -235,6 +272,35 @@ export default function NewCampaignPage() {
             </div>
           </div>
 
+          {/* Schedule */}
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-3">
+            <h3 className="font-bold text-gray-800 text-sm uppercase tracking-wide flex items-center gap-1.5">
+              <CalendarClock className="w-4 h-4" /> Schedule
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setScheduleMode('now')}
+                className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                  scheduleMode === 'now' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'
+                }`}>
+                Send now
+              </button>
+              <button onClick={() => setScheduleMode('later')}
+                className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                  scheduleMode === 'later' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-600 border-gray-200 hover:border-amber-300'
+                }`}>
+                Schedule
+              </button>
+            </div>
+            {scheduleMode === 'later' && (
+              <div className="animate-fade-in">
+                <label className="block text-xs text-gray-500 mb-1">Send at (your local time)</label>
+                <input type="datetime-local" value={scheduleAt} onChange={e => setScheduleAt(e.target.value)}
+                  className="input text-sm" />
+                <p className="text-xs text-gray-400 mt-1.5">The app auto-sends scheduled campaigns when the time comes.</p>
+              </div>
+            )}
+          </div>
+
           {/* Actions */}
           <div className="space-y-2">
             <button onClick={() => saveCampaign(false)} disabled={saving || sending}
@@ -249,5 +315,14 @@ export default function NewCampaignPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// useSearchParams requires a Suspense boundary in Next.js
+export default function NewCampaignPageWrapped() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-20"><div className="spinner" /></div>}>
+      <NewCampaignPage />
+    </Suspense>
   );
 }

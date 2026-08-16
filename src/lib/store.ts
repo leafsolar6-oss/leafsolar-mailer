@@ -19,7 +19,7 @@ import fs from 'fs';
 import path from 'path';
 import type {
   Contact, EmailList, Campaign, Template, Integration,
-  EmailLog, SMTPSettings, OutboxItem,
+  EmailLog, SMTPSettings, OutboxItem, TrackingEvent,
 } from '@/types';
 
 interface DBShape {
@@ -31,6 +31,7 @@ interface DBShape {
   integrations: Integration[];
   settings: Record<string, string>;
   email_logs: EmailLog[];
+  tracking_events: TrackingEvent[];
   outbox: OutboxItem[];
 }
 
@@ -44,6 +45,7 @@ function emptyDB(): DBShape {
     integrations: [],
     settings: {},
     email_logs: [],
+    tracking_events: [],
     outbox: [],
   };
 }
@@ -97,6 +99,14 @@ const store = {
     return load();
   },
 
+  /** Replaces the entire database (used by backup restore). Merges with the
+   *  empty shape so any missing collections from an older backup are backfilled. */
+  replace(next: Partial<DBShape>): DBShape {
+    cache = { ...emptyDB(), ...next };
+    persist();
+    return cache;
+  },
+
   // ---------------- contacts ----------------
   contacts: {
     all(): Contact[] {
@@ -120,6 +130,12 @@ const store = {
       const db = load();
       db.contacts = db.contacts.filter(c => c.id !== id);
       db.list_contacts = db.list_contacts.filter(lc => lc.contact_id !== id);
+      persist();
+    },
+    update(id: string, patch: Partial<Contact>): void {
+      const db = load();
+      const c = db.contacts.find(x => x.id === id);
+      if (c) Object.assign(c, patch, { updated_at: new Date().toISOString() });
       persist();
     },
   },
@@ -181,6 +197,26 @@ const store = {
       if (l) l.contact_count = total;
       persist();
       return removed;
+    },
+    /** Ids of every list a contact belongs to. */
+    contactListIds(contactId: string): string[] {
+      return load().list_contacts.filter(lc => lc.contact_id === contactId).map(lc => lc.list_id);
+    },
+    /** Replaces the full list membership of a contact (removes from others). */
+    setContactLists(contactId: string, listIds: string[]): void {
+      const db = load();
+      const keep = new Set(listIds);
+      db.list_contacts = db.list_contacts.filter(lc => lc.contact_id !== contactId || keep.has(lc.list_id));
+      for (const listId of listIds) {
+        if (!db.list_contacts.some(lc => lc.list_id === listId && lc.contact_id === contactId)) {
+          db.list_contacts.push({ list_id: listId, contact_id: contactId });
+        }
+      }
+      // Refresh contact_count on affected lists.
+      for (const l of db.email_lists) {
+        l.contact_count = db.list_contacts.filter(lc => lc.list_id === l.id).length;
+      }
+      persist();
     },
   },
 
@@ -310,6 +346,29 @@ const store = {
     },
     add(l: EmailLog): void {
       load().email_logs.push(l);
+      persist();
+    },
+    byTrackingId(trackingId: string): EmailLog | undefined {
+      return load().email_logs.find(l => l.tracking_id === trackingId);
+    },
+    update(id: string, patch: Partial<EmailLog>): void {
+      const db = load();
+      const l = db.email_logs.find(x => x.id === id);
+      if (l) Object.assign(l, patch);
+      persist();
+    },
+  },
+
+  // ---------------- tracking events ----------------
+  events: {
+    all(logId?: string, limit = 500): TrackingEvent[] {
+      let rows = load().tracking_events.slice();
+      if (logId) rows = rows.filter(e => e.log_id === logId);
+      rows.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+      return rows.slice(0, limit);
+    },
+    add(e: TrackingEvent): void {
+      load().tracking_events.push(e);
       persist();
     },
   },

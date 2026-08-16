@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { bulkAddContacts } from '@/lib/queries';
+import { bulkAddContacts, addContactsToList } from '@/lib/queries';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import { requireAuth } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
+    const listId = (formData.get('listId') as string) || '';
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
 
@@ -82,6 +86,19 @@ export async function POST(req: NextRequest) {
     }
 
     const result = bulkAddContacts(contacts);
+
+    // Optionally assign the newly imported contacts straight to a list.
+    if (listId && result.success > 0) {
+      const { getContacts } = await import('@/lib/queries');
+      const emails = new Set(
+        contacts.map((c: any) => (c.email || '').toLowerCase().trim()).filter(Boolean)
+      );
+      const ids = getContacts()
+        .filter(c => emails.has(c.email.toLowerCase()))
+        .map(c => c.id);
+      if (ids.length) addContactsToList(listId, ids);
+    }
+
     return NextResponse.json({ ...result, total: contacts.length });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

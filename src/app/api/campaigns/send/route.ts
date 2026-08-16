@@ -1,95 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getCampaignById, updateCampaign, getListContactIds,
-  getContactById, addEmailLog
-} from '@/lib/queries';
-import { sendEmail, mergeTemplate } from '@/lib/email';
+import { requireAuth } from '@/lib/auth';
+import { getCampaignById, updateCampaign } from '@/lib/queries';
+import { sendCampaignById } from '@/lib/campaign-send';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+/**
+ * POST /api/campaigns/send { campaignId }
+ * Sends a campaign immediately. If the campaign has a future scheduled_at it
+ * stays "scheduled" (the scheduler auto-sends it when the time comes).
+ */
 export async function POST(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   try {
     const { campaignId } = await req.json();
     const campaign = getCampaignById(campaignId);
     if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
 
-    // Gather recipient IDs from selected lists
-    const recipientIds = new Set<string>();
-    for (const listId of campaign.list_ids) {
-      const ids = getListContactIds(listId);
-      ids.forEach(id => recipientIds.add(id));
+    if (campaign.scheduled_at && campaign.scheduled_at > new Date().toISOString()) {
+      updateCampaign(campaignId, { status: 'scheduled' });
+      return NextResponse.json({
+        success: true,
+        scheduled: true,
+        scheduled_at: campaign.scheduled_at,
+        message: 'Campaign scheduled — it will send automatically at the scheduled time.',
+      });
     }
 
-    if (recipientIds.size === 0) {
-      return NextResponse.json({ error: 'No recipients found. Add contacts to your selected lists.' }, { status: 400 });
+    const result = await sendCampaignById(campaignId);
+    if (!result.success) {
+      return NextResponse.json({ error: result.errors[0] || 'Failed to send' }, { status: 400 });
     }
-
-    updateCampaign(campaignId, { status: 'sending', recipient_count: recipientIds.size });
-
-    let sent = 0, failed = 0;
-    const errors: string[] = [];
-
-    for (const contactId of recipientIds) {
-      const contact = getContactById(contactId);
-      if (!contact || contact.status !== 'active') continue;
-
-      const personalizedHtml = mergeTemplate(campaign.body, {
-        name: contact.name,
-        email: contact.email,
-        company: contact.company,
-      });
-
-      const subject = mergeTemplate(campaign.subject, {
-        name: contact.name,
-        email: contact.email,
-        company: contact.company,
-      });
-
-      const result = await sendEmail({
-        to: contact.email,
-        subject,
-        html: personalizedHtml,
-        fromName: campaign.sender_name,
-        fromEmail: campaign.sender_email,
-        replyTo: campaign.reply_to,
-      });
-
-      if (result.success) {
-        sent++;
-        addEmailLog({
-          campaign_id: campaignId,
-          contact_email: contact.email,
-          contact_name: contact.name,
-          subject,
-          status: 'sent',
-        });
-      } else {
-        failed++;
-        errors.push(`${contact.email}: ${result.error}`);
-        addEmailLog({
-          campaign_id: campaignId,
-          contact_email: contact.email,
-          contact_name: contact.name,
-          subject,
-          status: 'failed',
-          error: result.error,
-        });
-      }
-    }
-
-    updateCampaign(campaignId, {
-      status: failed > 0 && sent === 0 ? 'failed' : 'sent',
-      sent_count: sent,
-      failed_count: failed,
-      sent_at: new Date().toISOString(),
-    });
-
-    return NextResponse.json({
-      success: true,
-      sent,
-      failed,
-      total: recipientIds.size,
-      errors: errors.slice(0, 20),
-    });
+    return NextResponse.json(result);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Failed to send' }, { status: 500 });
   }
 }

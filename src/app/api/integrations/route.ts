@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getIntegrations, upsertIntegration, bulkAddContacts } from '@/lib/queries';
+import { requireAuth } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   try {
     return NextResponse.json(getIntegrations());
   } catch (err: any) {
@@ -10,6 +13,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   try {
     const body = await req.json();
     const integration = upsertIntegration(body);

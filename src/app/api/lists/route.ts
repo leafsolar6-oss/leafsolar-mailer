@@ -2,20 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getLists, createList, deleteList, addContactsToList,
   removeContactsFromList, getListContactIds, updateListMeta,
+  getListsForContact,
 } from '@/lib/queries';
 import { bulkAddContacts } from '@/lib/queries';
+import { requireAuth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  const contactIds = req.nextUrl.searchParams.get('contactIds');
-  if (contactIds) {
-    return NextResponse.json(getListContactIds(contactIds));
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
+  try {
+    // Ids of the lists a specific contact belongs to.
+    const contactId = req.nextUrl.searchParams.get('contactId');
+    if (contactId) {
+      return NextResponse.json(getListsForContact(contactId).map(l => l.id));
+    }
+    return NextResponse.json(getLists());
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-  return NextResponse.json(getLists());
 }
 
 export async function POST(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   try {
     const body = await req.json();
 
@@ -66,6 +77,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  if (!requireAuth(req)) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   try {
     const { id } = await req.json();
     deleteList(id);
