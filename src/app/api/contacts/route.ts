@@ -4,7 +4,7 @@ import {
   updateContact, setContactLists,
 } from '@/lib/queries';
 import { requireAuth } from '@/lib/auth';
-import { flushNow } from '@/lib/store';
+import { flushNow, syncFromPersist } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     const body = await req.json();
 
     // Bulk import (optionally assign to a list via listId or list_ids)
@@ -71,6 +72,7 @@ export async function PUT(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     const body = await req.json();
     const { id, ...patch } = body;
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
@@ -87,6 +89,7 @@ export async function DELETE(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     const body = await req.json();
     const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
     if (!ids.length) return NextResponse.json({ error: 'Contact id(s) required' }, { status: 400 });

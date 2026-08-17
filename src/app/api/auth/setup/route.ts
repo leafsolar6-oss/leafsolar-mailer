@@ -3,7 +3,7 @@ import {
   isAuthConfigured, setupAdmin, createSessionToken, applySessionCookie, getAuthEmail,
 } from '@/lib/auth';
 import { setSMTPSettings } from '@/lib/queries';
-import { whenStoreReady, flushNow } from '@/lib/store';
+import { whenStoreReady, flushNow, syncFromPersist } from '@/lib/store';
 import type { SMTPSettings } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +17,7 @@ export async function GET() {
 /** POST: create the admin account (only allowed before any account exists). */
 export async function POST(req: NextRequest) {
   try {
-    await whenStoreReady();
+    await syncFromPersist();
     if (isAuthConfigured()) {
       return NextResponse.json({ error: 'Already configured. Please log in.' }, { status: 400 });
     }

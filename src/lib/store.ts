@@ -81,6 +81,8 @@ export function onStoreReady(fn: () => void): void {
 let hydrated = false;
 let hydrateStarted = false;
 let loadedFromPersist = false; // true when we actually READ real data from a durable store
+let lastPersistSync = 0; // last time cache was refreshed FROM the durable store
+let refreshInFlight = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 function runReadyHooks(): void {
@@ -170,6 +172,7 @@ function hydrate(): Promise<void> {
           writeFile();
           runReadyHooks(); // re-seed any templates missing from the snapshot
           loadedFromPersist = true;
+          lastPersistSync = Date.now();
         }
         // raw === null: durable store has no data yet (first run). Keep the
         // seeded in-memory store but DO NOT background-flush it — pushing now
@@ -205,8 +208,51 @@ export async function flushNow(): Promise<void> {
   }
 }
 
+/** Replaces the in-memory cache with the LATEST snapshot from the durable
+ *  store. Prevents the multi-instance stale-cache bug: without this, instance
+ *  B (with an older copy) could flush over data written by instance A, making
+ *  contacts/lists "not stick". Write routes call this BEFORE mutating so
+ *  every change is applied on top of the freshest state. */
+async function refreshFromPersist(): Promise<void> {
+  if (refreshInFlight) return;
+  refreshInFlight = true;
+  try {
+    const raw = await pullSnapshot();
+    if (raw) {
+      let parsed: Partial<DBShape> = {};
+      try { parsed = JSON.parse(raw); } catch { /* invalid snapshot */ }
+      cache = { ...emptyDB(), ...parsed };
+      lastPersistSync = Date.now();
+      loadedFromPersist = true;
+      runReadyHooks(); // re-seed templates idempotently
+      writeFile();
+    }
+  } catch {
+    // Keep current cache — never clobber.
+  } finally {
+    refreshInFlight = false;
+  }
+}
+
+/** Await this at the start of any WRITE so the mutation applies to the latest
+ *  durable state (never a stale instance copy). */
+export async function syncFromPersist(): Promise<void> {
+  await hydrate();
+  if (!anyPersistConfigured()) return;
+  await refreshFromPersist();
+}
+
+const READ_REFRESH_MS = 8000; // re-sync reads from the durable store at most every 8s
+
 function load(): DBShape {
-  if (cache) return cache;
+  if (cache) {
+    // Background freshness: another serverless instance may have written
+    // newer data; refresh our copy every few seconds so reads converge.
+    if (anyPersistConfigured() && hydrated && Date.now() - lastPersistSync > READ_REFRESH_MS) {
+      void refreshFromPersist();
+    }
+    return cache;
+  }
   let next: DBShape;
   try {
     if (fs.existsSync(FILE)) {

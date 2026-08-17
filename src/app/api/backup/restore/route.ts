@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { flushNow } from '@/lib/store';
+import { flushNow, syncFromPersist } from '@/lib/store';
 import { restoreFromPayload, writeBackupFile } from '@/lib/backup';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
   try {
+    await syncFromPersist();
     const body = await req.json();
     if (!body || !body.data) {
       return NextResponse.json({ error: 'Upload a valid backup file (JSON)' }, { status: 400 });

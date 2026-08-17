@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSMTPSettings, setSMTPSettings, getSetting, setSetting } from '@/lib/queries';
 import { verifySMTP } from '@/lib/email';
 import { requireAuth } from '@/lib/auth';
-import { flushNow } from '@/lib/store';
+import { flushNow, syncFromPersist } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     const body = await req.json();
     if (body.action === 'test') {
       const result = await verifySMTP(body);

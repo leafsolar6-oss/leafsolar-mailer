@@ -6,7 +6,7 @@ import {
 } from '@/lib/queries';
 import { bulkAddContacts } from '@/lib/queries';
 import { requireAuth } from '@/lib/auth';
-import { flushNow } from '@/lib/store';
+import { flushNow, syncFromPersist } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     const body = await req.json();
 
     // Remove contacts from a list
@@ -86,6 +87,7 @@ export async function DELETE(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     const { id } = await req.json();
     deleteList(id);
     return NextResponse.json({ success: true });

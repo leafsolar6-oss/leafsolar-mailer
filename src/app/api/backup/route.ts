@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { flushNow } from '@/lib/store';
+import { flushNow, syncFromPersist } from '@/lib/store';
 import {
   createBackupPayload, writeBackupFile, listServerBackups, readServerBackupFile,
 } from '@/lib/backup';
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
   try {
+    await syncFromPersist();
     const file = writeBackupFile();
     await flushNow();
     return NextResponse.json({ success: true, file, meta: createBackupPayload().meta });

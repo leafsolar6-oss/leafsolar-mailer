@@ -4,7 +4,7 @@ import store from '@/lib/store';
 import { sendEmail, mergeTemplate, addTrackingToHtml, makeTrackingId } from '@/lib/email';
 import { addEmailLog, bulkAddContacts } from '@/lib/queries';
 import { requireAuth } from '@/lib/auth';
-import { flushNow } from '@/lib/store';
+import { flushNow, syncFromPersist } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     const body = await req.json();
     const items: any[] = Array.isArray(body.items) ? body.items : [];
     const results: Record<string, { ok: boolean; error?: string }> = {};

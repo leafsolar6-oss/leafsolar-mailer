@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { flushNow } from '@/lib/store';
+import { flushNow, syncFromPersist } from '@/lib/store';
 import { getCampaignById, updateCampaign } from '@/lib/queries';
 import { sendCampaignById } from '@/lib/campaign-send';
 
@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     const { campaignId } = await req.json();
     const campaign = getCampaignById(campaignId);
     if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });

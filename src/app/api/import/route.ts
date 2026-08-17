@@ -3,12 +3,13 @@ import { bulkAddContacts, addContactsToList } from '@/lib/queries';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { requireAuth } from '@/lib/auth';
-import { flushNow } from '@/lib/store';
+import { flushNow, syncFromPersist } from '@/lib/store';
 
 export async function POST(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     const formData = await req.formData();
     const file = formData.get('file') as File;
     const listId = (formData.get('listId') as string) || '';

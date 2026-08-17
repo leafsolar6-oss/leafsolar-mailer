@@ -3,13 +3,13 @@ import {
   isAuthConfigured, verifyCredentials, createSessionToken, applySessionCookie,
   checkLoginLockout, recordFailedLogin, clearLoginFailures,
 } from '@/lib/auth';
-import { whenStoreReady, flushNow } from '@/lib/store';
+import { whenStoreReady, flushNow, syncFromPersist } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    await whenStoreReady();
+    await syncFromPersist();
     if (!isAuthConfigured()) {
       return NextResponse.json({ error: 'No admin account configured on this deployment.' }, { status: 400 });
     }

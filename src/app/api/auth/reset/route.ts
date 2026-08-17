@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resetPasswordWithToken, createSessionToken, applySessionCookie, getAuthEmail } from '@/lib/auth';
-import { whenStoreReady, flushNow } from '@/lib/store';
+import { whenStoreReady, flushNow, syncFromPersist } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 /** POST /api/auth/reset { token, password, confirm } — sets a new password. */
 export async function POST(req: NextRequest) {
-  await whenStoreReady();
+  await syncFromPersist();
   const body = await req.json().catch(() => ({}));
   const token = (body.token || '').trim();
   const password = body.password || '';
