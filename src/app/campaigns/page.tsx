@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import type { Campaign } from '@/types';
 import { offlineFetch } from '@/lib/offline';
 import { playSentSound } from '@/lib/sounds';
+import { notifyCampaignDone } from '@/lib/notifications';
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -29,7 +30,13 @@ export default function CampaignsPage() {
     });
     const data = await res.json();
     setSending(null);
-    if (res.ok) { playSentSound(); toast.success(`Sent ${data.sent} (${data.failed} failed)`); load(); }
+    if (res.ok) {
+      const cname = campaigns.find(x => x.id === id)?.name || 'Campaign';
+      playSentSound();
+      void notifyCampaignDone(cname, data.sent, data.failed);
+      toast.success(`Sent ${data.sent} (${data.failed} failed)`);
+      load();
+    }
     else toast.error(data.error);
   };
 

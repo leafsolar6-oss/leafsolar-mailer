@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import AppShell from '@/components/AppShell';
 import BackButtonHandler from '@/components/BackButtonHandler';
 import NotificationPoller from '@/components/NotificationPoller';
+import NotificationsManager from '@/components/NotificationsManager';
 import PWARegister from '@/components/PWARegister';
 import InstallPrompt from '@/components/InstallPrompt';
 import SchedulerPoller from '@/components/SchedulerPoller';
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <PWARegister />
         <SchedulerPoller />
         <BackButtonHandler />
+        <NotificationsManager />
         <NotificationPoller />
         <AppShell>{children}</AppShell>
         <Toaster position="top-center" toastOptions={{

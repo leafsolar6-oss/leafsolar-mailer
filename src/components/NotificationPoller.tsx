@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { playIncomingSound, unlockAudio } from '@/lib/sounds';
+import { notifyNewEmail } from '@/lib/notifications';
 
 const POLL_MS = 45000; // every 45s
 const LAST_ID_KEY = 'ls_last_inbox_id';
@@ -44,6 +45,9 @@ export default function NotificationPoller() {
         if (lastId && latest.id !== lastId && !latest.seen) {
           const sender = latest.from_name || latest.from || 'someone';
           playIncomingSound();
+          // Real system notification — pops up even if the phone is locked or
+          // you're in another app (when the app process can run).
+          void notifyNewEmail(sender, latest.subject || '');
           toast.success(`📥 New email from ${sender}`, { duration: 5000 });
           document.title = '📥 New email — Leaf Solar Mailer';
           setTimeout(() => {

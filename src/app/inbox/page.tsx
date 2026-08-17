@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { playSentSound, playErrorSound } from '@/lib/sounds';
+import { notifySent } from '@/lib/notifications';
 import { offlineFetch } from '@/lib/offline';
 
 interface Message {
@@ -205,6 +206,7 @@ export default function InboxPage() {
       const data = await res.json();
       if (!res.ok) { playErrorSound(); return toast.error(data.error || 'Reply failed'); }
       playSentSound();
+      void notifySent(replyForm.subject);
       toast.success('Reply sent');
       setReplying(false);
       load(); // refresh so the reply shows in Sent

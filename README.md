@@ -208,3 +208,36 @@ The scheduler endpoint also runs when called manually — you can hit
 
 ## 📄 License
 MIT © Leaf Solar
+
+## 🔔 Notifications & Background Sync
+
+### In-app + device notifications (works now, no setup)
+- **Sounds** — a chime when a new email arrives, a blip when an email is sent
+  (toggle in Settings → Notification Sounds).
+- **Device notifications** — real Android pop-ups (even when the phone is
+  locked or you're in another app) for new mail, sent emails and campaign
+  results, via `@capacitor/local-notifications`. The app asks for permission
+  on your first tap (Android 13+). Toggle in Settings → Device Notifications.
+- **Background sync** — the service worker's background sync flushes the
+  offline outbox (queued sends/contact adds) when connectivity returns, even
+  if the app is backgrounded.
+
+### True closed-app push (Firebase Cloud Messaging) — optional, ~10 min
+For push notifications that arrive even when the app is fully force-closed,
+wire up FCM:
+
+1. Create a free project at https://console.firebase.google.com → **Add app** →
+   Android → package name **`ng.leafsolar.mailer`**.
+2. Download **`google-services.json`** and place it at
+   `android/app/google-services.json`.
+3. In the CI workflow (`.github/workflows/android.yml`), the Android build will
+   pick it up automatically if present (commit it or make it available to the
+   runner). The app's `src/lib/notifications.ts` already centralizes
+   permission + channels; add `@capacitor/push-notifications` and register the
+   FCM token there.
+4. Add your **FCM server key** (or service account) as a Vercel env var
+   (`FCM_SERVER_KEY`), then any server event (new email detected by the
+   scheduler, campaign finished, reply received) can push to the device.
+
+Until step 1–2 are done, local notifications cover the "locked/idle/other
+app" case whenever the app process is alive.

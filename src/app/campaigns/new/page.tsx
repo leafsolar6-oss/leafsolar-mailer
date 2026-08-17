@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Save, Send, Eye, FileText, ListChecks, CalendarClock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { playSentSound } from '@/lib/sounds';
+import { notifyCampaignDone } from '@/lib/notifications';
 import Link from 'next/link';
 import type { EmailList, Template } from '@/types';
 
@@ -109,6 +110,7 @@ function NewCampaignPage() {
         const data = await sendRes.json();
         if (sendRes.ok) {
           playSentSound();
+          void notifyCampaignDone(name, data.sent, data.failed);
           toast.success(`Campaign sent! ${data.sent} delivered, ${data.failed} failed`);
           router.push('/campaigns');
         } else {

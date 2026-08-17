@@ -5,6 +5,7 @@ import { Send, Bold, Italic, Underline, Link2, List, Eye, FileText, ArrowLeft } 
 import toast from 'react-hot-toast';
 import { offlineFetch } from '@/lib/offline';
 import { playSentSound } from '@/lib/sounds';
+import { notifySent } from '@/lib/notifications';
 import type { Contact, Template } from '@/types';
 
 export default function ComposePage() {
@@ -63,6 +64,7 @@ export default function ComposePage() {
         toast.success('Saved to outbox — will send when online');
       } else {
         playSentSound();
+        void notifySent(subject);
         toast.success('Email sent successfully');
       }
       router.push('/');

@@ -2,13 +2,14 @@
 import { useEffect, useState } from 'react';
 import {
   Mail, Send, CheckCircle2, AlertCircle, Info, Smartphone, ShieldCheck,
-  KeyRound, LogOut, User, Volume2,
+  KeyRound, LogOut, User, Volume2, BellRing,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import type { SMTPSettings } from '@/types';
 import { offlineFetch } from '@/lib/offline';
 import { setSoundsEnabled, unlockAudio } from '@/lib/sounds';
+import { setNotificationsEnabled, requestNotificationPermission } from '@/lib/notifications';
 
 const PRESETS = [
   { name: 'Truehost / Cloudoon (your hosting)', host: 'mail.leafsolar.ng', port: 587, secure: false },
@@ -27,6 +28,8 @@ export default function SettingsPage() {
   const [account, setAccount] = useState<{ email: string } | null>(null);
   const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
   const [soundsOn, setSoundsOn] = useState(true);
+  const [notifOn, setNotifOn] = useState(true);
+  const [permState, setPermState] = useState<string>('unknown');
   const [s, setS] = useState<SMTPSettings>({
     host: 'mail.leafsolar.ng', port: 587, secure: false, user: '', pass: '',
     from_name: 'Leaf Solar', from_email: '',
@@ -66,7 +69,22 @@ export default function SettingsPage() {
 
   useEffect(() => {
     try { setSoundsOn(localStorage.getItem('ls_sounds') !== 'off'); } catch { /* ignore */ }
+    try { setNotifOn(localStorage.getItem('ls_notifications') !== 'off'); } catch { /* ignore */ }
+    // reflect current system permission
+    import('@capacitor/local-notifications').then(m => m.LocalNotifications.checkPermissions())
+      .then(p => setPermState(p.display)).catch(() => setPermState('unsupported'));
   }, []);
+
+  const toggleNotifs = (on: boolean) => {
+    setNotifOn(on);
+    setNotificationsEnabled(on);
+  };
+
+  const allowNotifs = async () => {
+    const ok = await requestNotificationPermission();
+    if (ok) { setPermState('granted'); toast.success('Notifications enabled'); }
+    else toast.error('Notification permission was denied — enable it in system Settings');
+  };
 
   const toggleSounds = (on: boolean) => {
     setSoundsOn(on);
@@ -279,7 +297,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Notification sounds */}
+      {/* Notification Sounds */}
       <div className="card overflow-hidden">
         <div className="p-5 border-b border-gray-100 flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center">
@@ -301,6 +319,44 @@ export default function SettingsPage() {
               <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${soundsOn ? 'left-6' : 'left-1'}`} />
             </button>
           </label>
+        </div>
+      </div>
+
+      {/* Device notifications */}
+      <div className="card overflow-hidden">
+        <div className="p-5 border-b border-gray-100 flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center">
+            <BellRing className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="font-bold text-gray-900">Device Notifications</h2>
+            <p className="text-sm text-gray-500">Pop-up alerts for new mail & activity — even when the phone is locked or you're in another app</p>
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <label className="flex items-center justify-between gap-4 cursor-pointer">
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">Show notifications</p>
+              <p className="text-xs text-gray-500 mt-0.5">New emails, sent emails, campaign results</p>
+            </div>
+            <button onClick={() => toggleNotifs(!notifOn)}
+              className={`w-12 h-7 rounded-full transition-colors relative flex-shrink-0 ${notifOn ? 'bg-emerald-600' : 'bg-gray-300'}`}>
+              <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${notifOn ? 'left-6' : 'left-1'}`} />
+            </button>
+          </label>
+          {notifOn && permState !== 'granted' && (
+            <div className="flex items-center justify-between gap-3 p-3.5 bg-blue-50 rounded-2xl">
+              <p className="text-xs text-blue-800">
+                {permState === 'denied'
+                  ? 'Permission was denied. Enable it in Android Settings → Apps → Leaf Solar Mailer → Notifications.'
+                  : 'Allow notifications to get alerts even when the app is closed or the phone is locked.'}
+              </p>
+              <button onClick={allowNotifs} className="btn btn-primary !py-2 !px-3 text-xs whitespace-nowrap">Allow</button>
+            </div>
+          )}
+          <p className="text-xs text-gray-400">
+            For alerts when the app is fully closed, we recommend the optional Firebase push setup (see README).
+          </p>
         </div>
       </div>
     </div>
