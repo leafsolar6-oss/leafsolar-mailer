@@ -5,6 +5,7 @@ import { Plus, Mail, Clock, CheckCircle2, XCircle, TrendingUp, Trash2, Send, Cal
 import toast from 'react-hot-toast';
 import type { Campaign } from '@/types';
 import { offlineFetch } from '@/lib/offline';
+import { playSentSound } from '@/lib/sounds';
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -28,7 +29,7 @@ export default function CampaignsPage() {
     });
     const data = await res.json();
     setSending(null);
-    if (res.ok) { toast.success(`Sent ${data.sent} (${data.failed} failed)`); load(); }
+    if (res.ok) { playSentSound(); toast.success(`Sent ${data.sent} (${data.failed} failed)`); load(); }
     else toast.error(data.error);
   };
 

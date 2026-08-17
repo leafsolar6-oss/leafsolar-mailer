@@ -7,6 +7,7 @@ import {
   Eye, MousePointerClick, Download, CalendarClock, UserX,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { playSentSound } from '@/lib/sounds';
 import type { Campaign as CampaignType, EmailLog } from '@/types';
 
 export default function CampaignDetailPage() {
@@ -42,7 +43,7 @@ export default function CampaignDetailPage() {
     setSending(false);
     if (res.ok) {
       if (data.scheduled) toast.success(`Scheduled for ${new Date(data.scheduled_at).toLocaleString()}`);
-      else toast.success(`Sent ${data.sent}, ${data.failed} failed`);
+      else { playSentSound(); toast.success(`Sent ${data.sent}, ${data.failed} failed`); }
       load();
     } else toast.error(data.error);
   };

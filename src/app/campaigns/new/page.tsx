@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Save, Send, Eye, FileText, ListChecks, CalendarClock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { playSentSound } from '@/lib/sounds';
 import Link from 'next/link';
 import type { EmailList, Template } from '@/types';
 
@@ -107,6 +108,7 @@ function NewCampaignPage() {
         });
         const data = await sendRes.json();
         if (sendRes.ok) {
+          playSentSound();
           toast.success(`Campaign sent! ${data.sent} delivered, ${data.failed} failed`);
           router.push('/campaigns');
         } else {

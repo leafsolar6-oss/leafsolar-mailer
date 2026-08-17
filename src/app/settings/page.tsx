@@ -2,12 +2,13 @@
 import { useEffect, useState } from 'react';
 import {
   Mail, Send, CheckCircle2, AlertCircle, Info, Smartphone, ShieldCheck,
-  KeyRound, LogOut, User,
+  KeyRound, LogOut, User, Volume2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import type { SMTPSettings } from '@/types';
 import { offlineFetch } from '@/lib/offline';
+import { setSoundsEnabled, unlockAudio } from '@/lib/sounds';
 
 const PRESETS = [
   { name: 'Truehost / Cloudoon (your hosting)', host: 'mail.leafsolar.ng', port: 587, secure: false },
@@ -25,6 +26,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const [account, setAccount] = useState<{ email: string } | null>(null);
   const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
+  const [soundsOn, setSoundsOn] = useState(true);
   const [s, setS] = useState<SMTPSettings>({
     host: 'mail.leafsolar.ng', port: 587, secure: false, user: '', pass: '',
     from_name: 'Leaf Solar', from_email: '',
@@ -60,6 +62,16 @@ export default function SettingsPage() {
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.replace('/login');
+  };
+
+  useEffect(() => {
+    try { setSoundsOn(localStorage.getItem('ls_sounds') !== 'off'); } catch { /* ignore */ }
+  }, []);
+
+  const toggleSounds = (on: boolean) => {
+    setSoundsOn(on);
+    setSoundsEnabled(on);
+    unlockAudio();
   };
 
   const applyPreset = (name: string) => {
@@ -264,6 +276,31 @@ export default function SettingsPage() {
               <LogOut className="w-4 h-4" /> Sign out
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Notification sounds */}
+      <div className="card overflow-hidden">
+        <div className="p-5 border-b border-gray-100 flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center">
+            <Volume2 className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <h2 className="font-bold text-gray-900">Notification Sounds</h2>
+            <p className="text-sm text-gray-500">Chime when a new email arrives, blip when an email is sent</p>
+          </div>
+        </div>
+        <div className="p-5">
+          <label className="flex items-center justify-between gap-4 cursor-pointer">
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">Play sounds</p>
+              <p className="text-xs text-gray-500 mt-0.5">Incoming mail & sent-email notifications</p>
+            </div>
+            <button onClick={() => toggleSounds(!soundsOn)}
+              className={`w-12 h-7 rounded-full transition-colors relative flex-shrink-0 ${soundsOn ? 'bg-emerald-600' : 'bg-gray-300'}`}>
+              <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${soundsOn ? 'left-6' : 'left-1'}`} />
+            </button>
+          </label>
         </div>
       </div>
     </div>

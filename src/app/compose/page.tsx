@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Send, Bold, Italic, Underline, Link2, List, Eye, FileText, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { offlineFetch } from '@/lib/offline';
+import { playSentSound } from '@/lib/sounds';
 import type { Contact, Template } from '@/types';
 
 export default function ComposePage() {
@@ -61,6 +62,7 @@ export default function ComposePage() {
       if (data.queued) {
         toast.success('Saved to outbox — will send when online');
       } else {
+        playSentSound();
         toast.success('Email sent successfully');
       }
       router.push('/');

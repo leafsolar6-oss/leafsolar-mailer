@@ -6,6 +6,8 @@ import {
   FolderInput, X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { playSentSound, playErrorSound } from '@/lib/sounds';
+import { offlineFetch } from '@/lib/offline';
 
 interface Message {
   id: string;
@@ -59,9 +61,9 @@ export default function InboxPage() {
 
   const load = useCallback(() => {
     setRefreshing(true);
-    fetch(`/api/inbox?folder=${encodeURIComponent(folder)}&limit=50`)
-      .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
-      .then(d => { if (Array.isArray(d)) setMessages(d); })
+    // Offline-friendly: cached copy is shown when the network is down.
+    offlineFetch<Message[]>(`/api/inbox?folder=${encodeURIComponent(folder)}&limit=50`)
+      .then(({ data }) => { if (Array.isArray(data)) setMessages(data); })
       .catch(e => toast.error(e.message))
       .finally(() => { setLoading(false); setRefreshing(false); });
   }, [folder]);
@@ -201,7 +203,8 @@ export default function InboxPage() {
         body: JSON.stringify({ action: 'reply', ...replyForm, body: html }),
       });
       const data = await res.json();
-      if (!res.ok) return toast.error(data.error || 'Reply failed');
+      if (!res.ok) { playErrorSound(); return toast.error(data.error || 'Reply failed'); }
+      playSentSound();
       toast.success('Reply sent');
       setReplying(false);
       load(); // refresh so the reply shows in Sent
