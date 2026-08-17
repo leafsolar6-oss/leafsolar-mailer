@@ -107,6 +107,8 @@ export function isOnline(): boolean {
  *  logged in while every write fails with "Authentication required". */
 function handleUnauthorized(res: Response): void {
   if (res.status === 401 && typeof window !== 'undefined') {
+    // Avoid a redirect loop if we're already on the login page.
+    if (window.location.pathname.startsWith('/login')) return;
     const next = window.location.pathname + window.location.search;
     window.location.href = `/login?next=${encodeURIComponent(next)}`;
     throw new Error('Session expired — please sign in again.');
