@@ -83,6 +83,47 @@ export async function canNotify(): Promise<boolean> {
   }
 }
 
+/**
+ * Registers the device's FCM push token with the server so notifications can
+ * arrive even when the app is force-closed. Requires the native
+ * @capacitor/push-notifications plugin + Firebase google-services.json to be
+ * present; until then this is a safe no-op (guarded, never breaks builds).
+ * Call after notification permission is granted.
+ */
+export async function registerPushToken(): Promise<void> {
+  try {
+    if (typeof window === 'undefined') return;
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+    if (!cap || typeof cap.isNativePlatform !== 'function' || !cap.isNativePlatform()) return;
+
+    // Dynamic specifier so TS/build tools don't require the plugin to be
+    // installed (it isn't, until Firebase is configured).
+    const spec = '@capacitor/push-' + 'notifications';
+    const mod: any = await import(spec).catch(() => null);
+    if (!mod) return; // plugin not installed (Firebase not configured yet)
+    const PushNotifications = mod.PushNotifications;
+
+    await PushNotifications.requestPermissions();
+    await PushNotifications.register();
+
+    PushNotifications.addListener('registration', async (token: { value: string }) => {
+      try {
+        await fetch('/api/push/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: token.value }),
+        });
+      } catch { /* offline */ }
+    });
+
+    PushNotifications.addListener('registrationError', () => { /* ignore */ });
+    // When the app is opened from a push tap, it's already running.
+    PushNotifications.addListener('pushNotificationActionPerformed', () => { /* noop */ });
+  } catch {
+    /* not available — safe no-op */
+  }
+}
+
 async function schedule(title: string, body: string, opts: { id?: number } = {}): Promise<void> {
   if (!enabled()) return;
   const a = await api();

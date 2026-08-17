@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import type { SMTPSettings } from '@/types';
 import { offlineFetch } from '@/lib/offline';
 import { setSoundsEnabled, unlockAudio } from '@/lib/sounds';
-import { setNotificationsEnabled, requestNotificationPermission } from '@/lib/notifications';
+import { setNotificationsEnabled, requestNotificationPermission, registerPushToken } from '@/lib/notifications';
 
 const PRESETS = [
   { name: 'Truehost / Cloudoon (your hosting)', host: 'mail.leafsolar.ng', port: 587, secure: false },
@@ -82,7 +82,11 @@ export default function SettingsPage() {
 
   const allowNotifs = async () => {
     const ok = await requestNotificationPermission();
-    if (ok) { setPermState('granted'); toast.success('Notifications enabled'); }
+    if (ok) {
+      setPermState('granted');
+      registerPushToken().catch(() => {});
+      toast.success('Notifications enabled');
+    }
     else toast.error('Notification permission was denied — enable it in system Settings');
   };
 

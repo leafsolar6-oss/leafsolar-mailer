@@ -1,6 +1,6 @@
 'use client';
 import { useEffect } from 'react';
-import { requestNotificationPermission } from '@/lib/notifications';
+import { requestNotificationPermission, registerPushToken } from '@/lib/notifications';
 
 const PERMISSION_ASKED_KEY = 'ls_notif_asked';
 
@@ -22,7 +22,11 @@ export default function NotificationsManager() {
       if (asked) return;
       asked = true;
       try { localStorage.setItem(PERMISSION_ASKED_KEY, '1'); } catch { /* ignore */ }
-      requestNotificationPermission().catch(() => {});
+      requestNotificationPermission()
+        .then(granted => {
+          if (granted) registerPushToken().catch(() => {});
+        })
+        .catch(() => {});
     };
 
     // First interaction (tap/key) — best moment to ask.
