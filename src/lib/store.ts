@@ -82,6 +82,7 @@ let hydrated = false;
 let hydrateStarted = false;
 let loadedFromPersist = false; // true when we actually READ real data from a durable store
 let lastPersistSync = 0; // last time cache was refreshed FROM the durable store
+let dirtySince = 0; // set on every local write; used to stop background refreshes from clobbering it
 let refreshInFlight = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -212,9 +213,18 @@ export async function flushNow(): Promise<void> {
  *  store. Prevents the multi-instance stale-cache bug: without this, instance
  *  B (with an older copy) could flush over data written by instance A, making
  *  contacts/lists "not stick". Write routes call this BEFORE mutating so
- *  every change is applied on top of the freshest state. */
+ *  every change is applied on top of the freshest state.
+ *
+ *  SAFETY: if we've made a local write within WRITE_HOLD_MS, we do NOT
+ *  refresh — pulling now would return data that predates our pending flush
+ *  and could erase the write (this was causing contacts to silently vanish:
+ *  a background refresh replaced the cache between a write and its flush). */
+const WRITE_HOLD_MS = 4000;
+
 async function refreshFromPersist(): Promise<void> {
   if (refreshInFlight) return;
+  // Never clobber a recent local write with a stale pull.
+  if (Date.now() - dirtySince < WRITE_HOLD_MS) return;
   refreshInFlight = true;
   try {
     const raw = await pullSnapshot();
@@ -248,6 +258,8 @@ function load(): DBShape {
   if (cache) {
     // Background freshness: another serverless instance may have written
     // newer data; refresh our copy every few seconds so reads converge.
+    // (refreshFromPersist itself skips if a local write is in flight, so it
+    // can never clobber a just-written contact/list.)
     if (anyPersistConfigured() && hydrated && Date.now() - lastPersistSync > READ_REFRESH_MS) {
       void refreshFromPersist();
     }
@@ -277,6 +289,7 @@ function load(): DBShape {
 
 function persist() {
   if (!cache) return;
+  dirtySince = Date.now();
   writeFile();
   scheduleFlush();
 }
@@ -290,6 +303,7 @@ const store = {
    *  empty shape so any missing collections from an older backup are backfilled. */
   replace(next: Partial<DBShape>): DBShape {
     cache = { ...emptyDB(), ...next };
+    dirtySince = Date.now();
     persist();
     return cache;
   },
