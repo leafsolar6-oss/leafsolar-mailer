@@ -80,6 +80,7 @@ export function onStoreReady(fn: () => void): void {
 
 let hydrated = false;
 let hydrateStarted = false;
+let loadedFromPersist = false; // true when we actually READ real data from a durable store
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 function runReadyHooks(): void {
@@ -168,13 +169,18 @@ function hydrate(): Promise<void> {
           cache = { ...emptyDB(), ...parsed };
           writeFile();
           runReadyHooks(); // re-seed any templates missing from the snapshot
+          loadedFromPersist = true;
         }
-        // Snapshot empty -> keep current cache (already seeded); flush persists it.
+        // raw === null: durable store has no data yet (first run). Keep the
+        // seeded in-memory store but DO NOT background-flush it — pushing now
+        // could clobber a real store whose read failed or wasn't ready.
       } catch {
         // Durable store unavailable — fall back to in-memory/file store.
+        // Do NOT flush: overwriting durable data with the seeded store would
+        // cause data loss (this is what erased the admin account).
       } finally {
         hydrated = true;
-        scheduleFlush();
+        if (loadedFromPersist) scheduleFlush();
       }
     })();
   }
