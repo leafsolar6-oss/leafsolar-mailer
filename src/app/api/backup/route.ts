@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
   try {
+    await syncFromPersist();
     const file = req.nextUrl.searchParams.get('file');
     if (file) {
       const content = readServerBackupFile(file);

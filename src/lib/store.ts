@@ -244,11 +244,19 @@ async function refreshFromPersist(): Promise<void> {
   }
 }
 
-/** Await this at the start of any WRITE so the mutation applies to the latest
- *  durable state (never a stale instance copy). */
+const SYNC_THROTTLE_MS = 2000; // don't re-pull from the durable store more often than this
+
+/** Await this at the start of any WRITE (or read needing freshness) so the
+ *  operation sees the latest durable state (never a stale instance copy).
+ *  Throttled, and skips entirely if this instance just wrote (the cache is
+ *  then the freshest source). */
 export async function syncFromPersist(): Promise<void> {
   await hydrate();
   if (!anyPersistConfigured()) return;
+  // If we just wrote locally, the cache IS the latest state — pulling now
+  // could return data that predates our pending flush.
+  if (Date.now() - dirtySince < WRITE_HOLD_MS) return;
+  if (Date.now() - lastPersistSync < SYNC_THROTTLE_MS) return;
   await refreshFromPersist();
 }
 

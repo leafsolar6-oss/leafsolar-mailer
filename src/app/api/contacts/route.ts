@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     const search = req.nextUrl.searchParams.get('search') || undefined;
     const listId = req.nextUrl.searchParams.get('listId') || undefined;
     const includeLists = req.nextUrl.searchParams.get('includeLists') === '1';

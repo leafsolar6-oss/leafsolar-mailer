@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     // Generic setting lookup: /api/settings?key=auto_backup
     const key = req.nextUrl.searchParams.get('key');
     if (key) return NextResponse.json({ key, value: getSetting(key) });

@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   if (!(await requireAuth(req))) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   try {
+    await syncFromPersist();
     // Ids of the lists a specific contact belongs to.
     const contactId = req.nextUrl.searchParams.get('contactId');
     if (contactId) {
